@@ -1,0 +1,2091 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sheetwright</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@700&family=Alegreya+Sans+SC:wght@500;600;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Alegreya:ital,wght@0,400;0,700;1,400&display=swap">
+<style>/* Layout: a toolbar over a stack of letter-size paper pages, laid out like the 2024 PHB sheet; data is "inked" in navy over slate form lines */
+:root {
+  --desk: #d8d6d2; --desk-fg: #23222a; --bar: #f4f3f0; --bar-line: #c9c6c0; --btn: #ffffff; --btn-fg: #23222a; --btn-line: #bdb9b2;
+  --focus: #7a1f24;
+  /* paper (always light: it's a printed sheet) */
+  --paper: #fbfaf7; --paper-2: #f1efea; --line: #6b6873; --line-soft: #b9b5bd; --label: #3a3840; --ink: #1d2c55; --ink-soft: #4b5a80; --accent: #8c2129; --grid: rgba(107,104,115,.10);
+  --f-label: "Alegreya Sans SC", "Gill Sans", "Trebuchet MS", sans-serif;
+  --f-ui: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
+  --f-text: "Alegreya", Georgia, "Times New Roman", serif;
+  --f-name: "Alegreya SC", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --desk: #18171c; --desk-fg: #e8e6ee; --bar: #222128; --bar-line: #34323c; --btn: #2c2a33; --btn-fg: #ece9f2; --btn-line: #45424e; --focus: #e0a3a8; color-scheme: dark } }
+:root[data-theme="dark"] { --desk: #18171c; --desk-fg: #e8e6ee; --bar: #222128; --bar-line: #34323c; --btn: #2c2a33; --btn-fg: #ece9f2; --btn-line: #45424e; --focus: #e0a3a8; color-scheme: dark }
+
+* { box-sizing: border-box }
+html, body { margin: 0 }
+body { background: var(--desk); color: var(--desk-fg); font-family: var(--f-ui); font-size: 15px; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bar) }
+
+/* ---------- toolbar ---------- */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bar); border-bottom: 1px solid var(--bar-line);
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.brand { font-family: var(--f-name); font-weight: 700; font-size: 18px; letter-spacing: .02em; margin-right: 6px; white-space: nowrap }
+.brand span { color: var(--focus) }
+.bar .grow { flex: 1 }
+.btn, .bar select { font: 600 14px var(--f-ui); color: var(--btn-fg); background: var(--btn); border: 1px solid var(--btn-line); border-radius: 7px; padding: 6px 12px; cursor: pointer; min-height: 34px }
+.btn:hover { border-color: var(--focus) }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff }
+.bar select { max-width: 220px }
+.btn[aria-pressed="true"] { background: var(--focus); color: var(--bar); border-color: var(--focus) }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }
+.status { font-size: 13px; opacity: .75; white-space: nowrap }
+.status.warn { color: var(--focus); opacity: 1; font-weight: 600 }
+
+/* ---------- pages ---------- */
+.desk { padding-block: 20px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: center; gap: 22px; overflow-x: hidden }
+.page { zoom: var(--z, 1); width: 816px; height: 1056px; flex: none; background: var(--paper); color: var(--label); position: relative; padding: 22px 24px; box-shadow: 0 2px 4px rgba(0,0,0,.12), 0 12px 30px rgba(0,0,0,.14);
+  background-image: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.7), transparent 60%), radial-gradient(ellipse at 80% 90%, rgba(120,110,100,.05), transparent 55%);
+  font-family: var(--f-ui); font-variant-numeric: lining-nums; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: hidden }
+.page.flow { height: auto; min-height: 1056px; overflow: visible }
+
+/* frame = ornamented box */
+.box { position: relative; background: var(--paper); border: 1.6px solid var(--line); border-radius: 10px; box-shadow: inset 0 0 0 2.5px var(--paper), inset 0 0 0 3.3px var(--line-soft); padding: 6px 9px 7px; display: flex; flex-direction: column; min-height: 0 }
+.box::before, .box::after { content: ""; position: absolute; width: 7px; height: 7px; border: 1.6px solid var(--line); background: var(--paper); transform: rotate(45deg); top: -5px }
+.box::before { left: 12px } .box::after { right: 12px }
+.box.plain::before, .box.plain::after { display: none }
+.ttl { font: 700 13px/1 var(--f-label); letter-spacing: .06em; text-align: center; color: var(--label); padding: 3px 0 5px; border-bottom: 1.2px solid var(--line); margin-bottom: 5px; text-transform: uppercase; font-size: 12px }
+.cap { font: 600 9.5px/1 var(--f-label); letter-spacing: .09em; text-transform: uppercase; color: var(--label) }
+.gridbg { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 11px 11px }
+
+/* inputs look like handwriting on lines */
+.fld { font-variant-numeric: lining-nums; font: 600 15px/1.15 var(--f-ui); color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line-soft); width: 100%; padding: 1px 2px; min-width: 0; border-radius: 0 }
+.fld:hover { background: rgba(29,44,85,.04) }
+.fld:focus { outline: none; background: rgba(29,44,85,.07); border-bottom-color: var(--ink) }
+.fld.c { text-align: center }
+.fld.big { font-size: 26px; font-weight: 700; border: 0; text-align: center }
+.fld.nob { border-bottom: 0 }
+.locked .fld:hover { background: transparent }
+.rich { font: 400 11.5px/1.32 var(--f-text); color: var(--ink); outline: none; overflow: hidden; font-size: calc(11.5px * var(--fs, 1)); min-height: 0 }
+.rich p { margin: 0 0 .32em } .rich p:last-child { margin-bottom: 0 }
+.rich strong { font-family: var(--f-ui); font-weight: 700; color: #16203f }
+.rich ul, .rich ol { margin: 0 0 .3em; padding-left: 1.2em }
+.rich:focus { background: rgba(29,44,85,.04); box-shadow: 0 0 0 1px rgba(29,44,85,.2) }
+.rich.over { box-shadow: inset 0 -14px 10px -10px rgba(140,33,41,.45) }
+.rich:empty::before { content: attr(data-ph); color: var(--line-soft); font-style: italic }
+
+/* diamonds & circles */
+.dia { appearance: none; -webkit-appearance: none; width: 11px; height: 11px; margin: 0; border: 1.5px solid var(--line); background: var(--paper); transform: rotate(45deg); cursor: pointer; flex: none; display: inline-block; vertical-align: middle; border-radius: 1px }
+.dia.on, .dia:checked { background: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--paper) }
+.dia.off { opacity: .28 }
+.dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; flex: none; padding: 0 }
+.dot[data-p="0.5"] { background: linear-gradient(90deg, var(--ink) 50%, var(--paper) 50%) }
+.dot[data-p="1"] { background: var(--ink); border-color: var(--ink) }
+.dot[data-p="2"] { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.2px var(--accent) }
+.locked .dot, .locked .dia { pointer-events: none }
+
+/* ---------- PAGE 1 ---------- */
+.p1 { display: grid; grid-template-columns: 146px 146px 1fr; grid-template-rows: 116px 24px 1fr 196px; gap: 7px 8px; height: 100% }
+.hdr { grid-column: 1 / -1; display: flex; gap: 8px; align-items: stretch }
+.ident { flex: 0 0 330px; padding: 6px 12px; justify-content: center; gap: 3px }
+.ident .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
+.ident .lbl { display: flex; flex-direction: column-reverse; gap: 1px }
+.ident .lbl .cap { font-size: 8.5px }
+.namefld { font-family: var(--f-name); font-size: 25px; font-weight: 700; letter-spacing: .02em }
+.lvl { flex: 0 0 74px; border: 1.6px solid var(--line); border-radius: 50% / 46%; background: var(--paper); box-shadow: inset 0 0 0 2.5px var(--paper), inset 0 0 0 3.3px var(--line-soft); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 8px 6px; gap: 2px }
+.lvl .fld { font-size: 22px; font-weight: 800; border-bottom: 1px solid var(--line-soft); text-align: center; width: 46px }
+.lvl .xp { font-size: 11px; font-weight: 600; width: 58px; border: 0 }
+.ac { flex: 0 0 84px; position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 7px; background: var(--paper); border: 1.6px solid var(--line); border-radius: 10px 10px 42px 42px / 10px 10px 58px 58px; box-shadow: inset 0 0 0 2.5px var(--paper), inset 0 0 0 3.3px var(--line-soft) }
+.ac .cap { text-align: center; line-height: 1.1; font-size: 10.5px; font-weight: 700 }
+.ac .fld.big { font-size: 34px; width: 64px; margin-top: 2px }
+.ac label { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: auto; margin-bottom: 9px; font: 600 8.5px var(--f-label); letter-spacing: .08em; text-transform: uppercase; cursor: pointer }
+.vit { flex: 1; display: grid; grid-template-columns: 1.45fr .78fr 1fr; padding: 0; overflow: hidden }
+.vit > div { padding: 6px 8px; display: flex; flex-direction: column; min-width: 0 }
+.vit > div + div { border-left: 1.2px solid var(--line) }
+.vit .ttl { border: 0; padding: 0 0 4px; margin: 0 }
+.hpgrid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; gap: 2px 8px; flex: 1 }
+.hpgrid .cur { grid-row: 1 / 3; display: flex; flex-direction: column; justify-content: flex-end }
+.hpgrid .cur .fld { font-size: 30px; font-weight: 800; text-align: center; border-bottom: 1px solid var(--line) }
+.stk { display: flex; flex-direction: column; justify-content: flex-end; gap: 1px }
+.stk .fld { text-align: center; font-size: 16px; font-weight: 700 }
+.stk .cap { font-size: 8.5px }
+.ds { gap: 6px; justify-content: center }
+.ds .row { display: flex; align-items: center; gap: 7px }
+.ds .cap { font-size: 8.5px; margin-left: 2px }
+.divider { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; color: var(--line) }
+.divider::before, .divider::after { content: ""; flex: 1; height: 5px; border-top: 1.3px solid var(--line); border-bottom: 1px solid var(--line-soft) }
+.divider span { font: 700 14px var(--f-name); letter-spacing: .22em; color: var(--label); text-transform: uppercase }
+.divider em { font: italic 400 12px var(--f-text); color: var(--ink-soft); letter-spacing: 0; text-transform: none }
+
+.colA, .colB { display: flex; flex-direction: column; gap: 7px; min-height: 0 }
+.colC { grid-column: 3; grid-row: 3 / 5; display: flex; flex-direction: column; gap: 7px; min-height: 0 }
+.pb { align-items: center; padding-bottom: 8px }
+.pb .ttl { width: 100% }
+.pb .fld.big { width: 70px; font-size: 30px; border: 1.5px solid var(--line); border-radius: 0 0 22px 22px; padding: 4px 0 6px }
+.abl { padding: 5px 7px 6px }
+.abl .ttl { margin-bottom: 3px }
+.amod { display: flex; align-items: center; gap: 0; margin: 1px 0 12px; height: 52px }
+.amod .circ { width: 52px; height: 52px; border-radius: 50%; border: 1.6px solid var(--line); display: grid; place-items: center; position: relative; z-index: 1; background: var(--paper); flex: none }
+.amod .circ b { font: 800 24px var(--f-ui); color: var(--ink) }
+.amod .circ i { position: absolute; bottom: -11px; font: 600 7.5px var(--f-label); letter-spacing: .1em; font-style: normal; text-transform: uppercase; background: var(--paper); padding: 0 2px }
+.amod .tab { flex: 1; height: 36px; margin-left: -8px; border: 1.4px solid var(--line); border-left: 0; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-left: 8px }
+.amod .tab .fld { font-size: 18px; font-weight: 700; text-align: center; border: 0; width: 46px; padding: 0 }
+.amod .tab .cap { font-size: 7.5px }
+.sk { display: flex; align-items: center; gap: 5px; font: 500 11.6px/1 var(--f-ui); color: var(--label); padding: 2.2px 0 }
+.sk .v { width: 22px; text-align: center; font-weight: 700; color: var(--ink); border-bottom: 1px solid var(--line-soft); font-size: 12px; padding-bottom: 1px; font-variant-numeric: tabular-nums }
+.sk.save { font-weight: 700; border-bottom: 1.2px solid var(--line); padding-bottom: 4px; margin-bottom: 2px }
+.heroic { align-items: center; justify-content: center; text-align: center; flex: 1; max-height: 92px }
+.heroic .ttl { border: 0; margin: 0; line-height: 1.15 }
+.heroic .dia { width: 22px; height: 22px; border-width: 2px; margin-top: 8px }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; height: 78px; flex: none }
+.stat { align-items: center; justify-content: flex-start; padding: 5px 6px }
+.stat .ttl { width: 100%; font-size: 11px; white-space: nowrap }
+.stat .val { font: 800 25px/1 var(--f-ui); color: var(--ink); margin-top: 6px }
+.stat .fld { text-align: center; font-size: 20px; font-weight: 800; border: 0; margin-top: 3px }
+.strip { display: flex; gap: 10px; font: 500 11px var(--f-ui); align-items: baseline; flex: none; padding: 0 4px }
+.strip label { display: flex; gap: 5px; align-items: baseline; flex: 1; min-width: 0 }
+.strip .fld { font-size: 12px; font-weight: 600 }
+
+table.tbl { border-collapse: collapse; width: 100%; table-layout: fixed }
+.tbl th { font: 500 10px var(--f-ui); text-align: left; color: var(--label); padding: 0 4px 2px; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--line-soft) }
+.tbl td { padding: 0 4px; height: var(--rh, 22px) }
+.tbl td .fld { font-size: 12.5px; font-weight: 600; padding: 2px 1px; height: calc(var(--rh, 22px) - 1px) }
+.tbl td.n .fld { font-weight: 700 }
+.weapons { flex: none }
+.weapons .tbl col.c1 { width: 32% } .weapons .tbl col.c2 { width: 13% } .weapons .tbl col.c3 { width: 22% }
+.features { flex: 1 }
+.features .rich { flex: 1; columns: 2; column-gap: 18px; column-rule: 1px solid var(--line-soft); column-fill: auto }
+.features .rich p { break-inside: avoid-column }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; height: 262px; flex: none }
+.pair .rich { flex: 1 }
+.training { grid-column: 1 / 3; grid-row: 4 }
+.training .armor { display: flex; align-items: center; gap: 9px; font: 500 11.5px var(--f-ui); padding: 2px 0 6px; border-bottom: 1.2px solid var(--line); flex-wrap: wrap }
+.training .armor .cap { font-size: 8.5px; line-height: 1 }
+.training .armor label { display: flex; align-items: center; gap: 4px; cursor: pointer }
+.training .sec { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-top: 4px }
+.training .sec + .sec { border-top: 1.2px solid var(--line) }
+.training .rich { flex: 1; font-size: calc(12px * var(--fs, 1)) }
+
+/* ---------- PAGE 2 ---------- */
+.p2 { display: grid; grid-template-columns: minmax(0, 1fr) 206px; gap: 8px; height: 100% }
+.p2 .left { min-width: 0; display: flex; flex-direction: column; gap: 8px; min-height: 0 }
+.p2 .right { min-width: 0; display: flex; flex-direction: column; gap: 8px; min-height: 0 }
+.sctop { display: grid; grid-template-columns: 172px 1fr; gap: 8px; height: 128px; flex: none }
+.scbox { padding: 0; display: grid; grid-template-rows: auto 1fr 1fr 1fr; overflow: hidden }
+.scbox .abil { padding: 4px 8px; border-bottom: 1.2px solid var(--line); display: flex; flex-direction: column-reverse }
+.scbox .abil select { font: 700 14px var(--f-ui); color: var(--ink); border: 0; background: transparent; border-bottom: 1px solid var(--line-soft); padding: 0; appearance: none; -webkit-appearance: none; cursor: pointer }
+.scbox .r { display: grid; grid-template-columns: 54px 1fr; border-top: 1px solid var(--line-soft) }
+.scbox .r:nth-child(2) { border-top: 0 }
+.scbox .r b { display: grid; place-items: center; font: 800 18px var(--f-ui); color: var(--ink); border-right: 1.2px solid var(--line) }
+.scbox .r span { font: 700 11px/1.05 var(--f-label); letter-spacing: .05em; text-transform: uppercase; display: flex; align-items: center; padding-left: 8px }
+.slots .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px 8px; flex: 1; align-content: center }
+.slots .sl { display: grid; grid-template-columns: 40px 22px 1fr; align-items: center; gap: 3px; min-width: 0 }
+.slots .sl .cap { font-size: 9px; letter-spacing: .03em; line-height: 1.05 }
+.slots .sl .fld { text-align: center; font-size: 13px; padding: 0 }
+.slots .sl .ds { display: flex; gap: 4px; align-items: center; padding-left: 2px }
+.slots .hd { display: grid; grid-template-columns: 44px 28px 1fr; font: 500 9px var(--f-ui); color: var(--label) }
+.slots .pact { display: block; font: 700 7.5px var(--f-label); color: var(--accent); letter-spacing: .08em }
+.spellsbox { flex: 1 }
+.spellsbox .tbl col.lv { width: 38px } .spellsbox .tbl col.ct { width: 58px } .spellsbox .tbl col.rg { width: 84px } .spellsbox .tbl col.crm { width: 82px } .spellsbox .tbl col.nt { width: 150px }
+.spellsbox .tbl th { vertical-align: bottom; line-height: 1.05 }
+.crm { display: flex; gap: 4px; align-items: center; font: 500 9px var(--f-ui); color: var(--line) }
+.crm label { display: flex; align-items: center; gap: 2px; cursor: pointer }
+.tbl tr.lvhead td { height: 15px; padding: 3px 4px 0; font: 700 9px var(--f-label); letter-spacing: .1em; color: var(--accent); text-transform: uppercase; border-bottom: 1px solid var(--line-soft) }
+.appear { height: 132px; flex: none }
+.backstory { flex: 1 }
+.backstory .align { display: flex; flex-direction: column-reverse; padding-top: 4px; border-top: 1px solid var(--line-soft); margin-top: 4px }
+.backstory .align .cap { text-transform: none; font: 500 10.5px var(--f-ui); letter-spacing: 0 }
+.langs { height: 78px; flex: none }
+.equip { height: 302px; flex: none }
+.equip .att { border-top: 1px solid var(--line-soft); margin-top: 4px; padding-top: 3px; display: flex; flex-direction: column; gap: 2px }
+.equip .att .cap { text-transform: none; font: 500 10.5px var(--f-ui); letter-spacing: 0 }
+.equip .att .row { display: flex; align-items: center; gap: 6px }
+.equip .att .fld { font-size: 12px }
+.coins { height: 84px; flex: none }
+.coins .cg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; flex: 1; align-items: center }
+.coins .c { display: flex; flex-direction: column; align-items: center; gap: 2px }
+.coins .c .cap { font-size: 8.5px; color: var(--line) }
+.coins .c .fld { border: 1.3px solid var(--line); border-radius: 3px 3px 9px 9px; text-align: center; font-size: 13px; height: 28px; padding: 0 }
+.rich.fill { flex: 1 }
+.foot { position: absolute; bottom: 7px; right: 26px; font: 400 8.5px var(--f-ui); color: var(--line) }
+.foot a { color: inherit }
+
+/* ---------- reference pages ---------- */
+.ref { padding: 36px 44px }
+.ref h2 { font: 700 20px var(--f-name); letter-spacing: .06em; color: var(--label); border-bottom: 1.5px solid var(--line); padding-bottom: 6px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline }
+.ref h2 small { font: 400 12px var(--f-text); color: var(--ink-soft); letter-spacing: 0; font-style: italic }
+.ref > .rich { columns: 2; column-gap: 26px; column-rule: 1px solid var(--line-soft); font-size: 11px; overflow: visible }
+.ref > .rich h3 { break-after: avoid; font: 700 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 14px 0 8px; border-bottom: 1px solid var(--line-soft); padding-bottom: 3px }
+.ref > .rich h3:first-child { margin-top: 0 }
+.ref > .rich h4 { font: 700 13px var(--f-ui); color: #16203f; margin: 10px 0 2px; break-after: avoid }
+.ref > .rich .meta, .ref > .rich h4 + p em:first-child { color: var(--ink-soft) }
+.ref > .rich table { border-collapse: collapse; margin: 4px 0 8px; font-size: 10px; width: 100%; break-inside: avoid }
+.ref > .rich td, .ref > .rich th { border-bottom: 1px solid var(--line-soft); padding: 2px 4px; text-align: left }
+
+/* ---------- dialog ---------- */
+dialog { border: 1px solid var(--bar-line); border-radius: 12px; background: var(--bar); color: var(--desk-fg); width: min(680px, calc(100vw - 32px)); padding: 0; max-height: calc(100vh - 40px) }
+dialog::backdrop { background: rgba(10,10,14,.5) }
+.dlg { padding: 22px 24px; display: flex; flex-direction: column; gap: 14px }
+.dlg h2 { margin: 0; font: 700 22px var(--f-name) }
+.dlg h3 { margin: 0 0 4px; font: 700 15px var(--f-ui) }
+.dlg p { margin: 0; line-height: 1.45; max-width: 64ch }
+.dlg ol { margin: 0; padding-left: 1.2em; line-height: 1.5 }
+.step { border: 1px solid var(--bar-line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--btn) }
+.step .n { font: 700 11px var(--f-label); letter-spacing: .12em; color: var(--focus); text-transform: uppercase }
+.bmk { display: inline-flex; align-items: center; gap: 6px; font: 700 14px var(--f-ui); background: var(--accent); color: #fff; padding: 7px 14px; border-radius: 999px; text-decoration: none; cursor: grab; width: fit-content }
+.dlg textarea { width: 100%; height: 90px; font: 12px ui-monospace, Menlo, Consolas, monospace; background: var(--bar); color: var(--desk-fg); border: 1px dashed var(--btn-line); border-radius: 8px; padding: 8px; resize: vertical }
+.dlg .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+.dlg .msg { font-weight: 600; min-height: 1.3em }
+.dlg .msg.err { color: var(--focus) }
+.dlg code { font-size: 12px; background: var(--bar); padding: 1px 4px; border-radius: 4px }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--desk-fg); color: var(--desk); padding: 9px 16px; border-radius: 8px; font-weight: 600; z-index: 20; opacity: 0; transition: opacity .2s; pointer-events: none }
+.toast.show { opacity: 1 }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none } }
+
+/* ---------- print ---------- */
+@page { size: letter; margin: 0 }
+@page refp { size: letter; margin: .45in .5in }
+@media print {
+  body { background: #fff }
+  body::before, .bar, .toast, dialog { display: none !important }
+  .desk { padding: 0; gap: 0; display: block }
+  .page { zoom: 1 !important; box-shadow: none; break-after: page; margin: 0 }
+  .page.flow { page: refp; padding: 0; min-height: 0; background: #fff; width: 7.5in; height: auto }
+  .rich.over { box-shadow: none }
+  .ref > .rich { width: 7.5in }
+  .noprint { display: none !important }
+  .fld { border-bottom-color: var(--line-soft) }
+}
+.page, .page * { font-variant-numeric: lining-nums !important }
+
+/* ===== Official-style frames (SVG drawn by frames.js) ===== */
+.page {
+  --paper: #ffffff; --label: #1c1c1c;
+  background-color: #e7e6e3;
+  background-image: radial-gradient(ellipse at 25% 15%, rgba(255,255,255,.55), transparent 55%), radial-gradient(ellipse at 80% 85%, rgba(255,255,255,.4), transparent 50%), radial-gradient(ellipse at 70% 30%, rgba(0,0,0,.035), transparent 45%), radial-gradient(ellipse at 20% 75%, rgba(0,0,0,.04), transparent 40%);
+}
+.page.flow { background: #fbfaf8 }
+.box { background: #fff }
+svg.frame { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; overflow: visible }
+.framed:not(.page) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; position: relative }
+.framed::before, .framed::after { display: none !important }
+.framed > :not(svg.frame) { position: relative; z-index: 1 }
+
+/* titles: bold caps with a black rule, like the printed sheet */
+.ttl { color: #1c1c1c; font-weight: 700; border-bottom: 1.3px solid #1c1c1c; letter-spacing: .05em }
+.box { padding: 9px 12px 10px }
+.fr-panel .rich.gridbg { background-color: #fff }
+
+/* ability blocks */
+.abl.framed { padding: 7px 13px 9px }
+.abl .ttl { border-bottom: 0; font-size: 13px; padding-top: 4px; margin-bottom: 1px }
+.fr-ability .amod .circ { border-color: transparent; background: transparent }
+.fr-ability .amod .circ i { background: transparent; bottom: -12px }
+.fr-ability .amod .tab { border-color: transparent; margin-left: 0; padding-left: 14px; align-items: center; height: 36px }
+.fr-ability .amod .tab .cap { align-self: flex-end; margin-right: 8px }
+.fr-ability .sk.save { border-bottom-color: transparent; padding-block: 5px 6px; margin-bottom: 3px }
+.sk { gap: 4px }
+.sk .v { width: 20px }
+
+/* proficiency bonus plate */
+.pb.framed { padding: 9px 12px 12px }
+.pb .ttl { border-bottom-width: 1.8px }
+.fr-pb .fld.big { border-color: transparent; background: transparent; padding: 6px 0 8px; width: 62px }
+
+/* header pieces */
+.fr-ac, .fr-lvl { border-color: transparent; background: transparent; box-shadow: none }
+.fr-ac { border-radius: 0 }
+.fr-lvl { border-radius: 0 }
+.fr-vit { padding: 0 }
+.fr-vit > div { padding: 9px 9px 9px }
+.fr-vit > div + div { border-left-color: transparent }
+.fr-vit .ttl { border-bottom: 0 }
+.ident.framed { padding: 8px 15px }
+
+/* banner rule */
+.divider.framed::before, .divider.framed::after { display: none }
+.divider.framed { justify-content: center }
+.divider.framed span { padding: 0 6px }
+
+/* stat boxes */
+.stat.framed { padding: 8px 9px }
+.stat .ttl { border-bottom-color: #1c1c1c }
+
+/* heroic inspiration */
+.heroic.framed { padding: 9px 10px 12px; max-height: 96px }
+.heroic .ttl { font-size: 12px }
+
+/* spellcasting block */
+.scbox.framed { padding: 5px 6px }
+.scbox .abil { border-bottom: 1.6px solid #8d8c8a }
+.scbox .r { border-top: 1px solid #a3a29f }
+.scbox .r b { border-right: 2px solid #8d8c8a }
+
+/* coins */
+.coins .c .fld { border-color: transparent; background: transparent; border-radius: 0; height: 30px; padding-top: 4px }
+.coins .c .cap { color: #6d6c6a }
+
+/* four-point star checkboxes, as on the printed sheet */
+.dia {
+  width: 13px; height: 13px; border: 0 !important; transform: none; border-radius: 0; box-shadow: none !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='%23fff' stroke='%231c1c1c' stroke-width='1.7' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+.dia.on, .dia:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='%238c2129' stroke='%238c2129' stroke-width='1.7' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+.heroic .dia { width: 24px; height: 24px; margin-top: 6px }
+.ac .dia { width: 14px; height: 14px }
+
+/* proficiency rings */
+.dot { width: 12px; height: 12px; border: 1.8px solid #1c1c1c }
+.dot[data-p="1"] { background: #1d2c55; border-color: #1c1c1c }
+.dot[data-p="0.5"] { background: linear-gradient(90deg, #1d2c55 50%, #fff 50%) }
+
+@media print { .page.flow { background: #fff } }
+
+/* --- spacing tune for framed ability column --- */
+.p1 { grid-template-rows: 116px 24px 1fr 170px }
+.colA, .colB { gap: 6px }
+.abl.framed { padding: 6px 11px 8px }
+.abl .ttl { padding-top: 2px; padding-bottom: 3px }
+.sk { padding: 1.7px 0; font-size: 11.2px; letter-spacing: -.01em; white-space: nowrap }
+.fr-ability .sk.save { padding-block: 4px 5px; margin-bottom: 2px }
+.fr-ability .amod { margin: 0 0 14px }
+.fr-ability .amod .circ i { bottom: -15px }
+.fr-ability .amod .tab { padding-top: 7px; justify-content: flex-start }
+.fr-ability .amod .tab .fld { margin-top: 2px }
+.heroic.framed { flex: none; height: 92px; max-height: none }
+.pb.framed { flex: none }
+.training .armor { gap: 7px; flex-wrap: nowrap; white-space: nowrap }
+.fr-ability .amod { margin-bottom: 16px }
+.fr-ability .amod .circ i { bottom: -17px }
+.slots .dia { width: 11px; height: 11px }
+.slots .sl .ds { gap: 2px }
+.coins .c { gap: 4px }
+.page.framed > .foot { position: absolute }
+
+/* ===== Paper play: tracking fields print blank ===== */
+.trk-blank .fld.trk { color: #a9a6ad; -webkit-text-fill-color: #a9a6ad }
+.trk-blank .trk .dia.on, .trk-blank .dia.trk:checked { opacity: .45 }
+@media print {
+  .trk-blank .fld.trk { color: transparent !important; -webkit-text-fill-color: transparent !important }
+  .trk-blank .trk .dia.on, .trk-blank .dia.trk:checked {
+    opacity: 1;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='%23fff' stroke='%231c1c1c' stroke-width='1.7' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  }
+  .fld::placeholder { color: transparent }
+}
+#f-extraNotes { min-height: 9.2in; font: 400 13px/26px var(--f-text); background-image: repeating-linear-gradient(transparent 0 25px, #cfcdd2 25px 26px); columns: 1 !important; padding-top: 2px }
+@media print { .rich:empty::before { content: none } }
+
+.fr-vit { grid-template-columns: 1.3fr .95fr 1fr }
+
+/* ===== Vitals box: shared rows so every line and label lines up ===== */
+.vit { display: grid; grid-template-columns: 1.5fr 1fr 1.05fr !important; align-items: stretch }
+.vit > .vcol { padding: 9px 11px 9px; display: flex; flex-direction: column; min-width: 0; border: 0 !important }
+.vit .ttl { height: 30px; display: flex; align-items: flex-start; justify-content: center; text-align: center; line-height: 1.05; padding: 0; margin: 0 }
+.vgrid { flex: 1; display: grid; grid-template-rows: 1fr 1fr; row-gap: 3px; min-height: 0 }
+.vgrid.hpg { grid-template-columns: minmax(0, 1fr) 54px; column-gap: 10px }
+.vgrid .cell { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; min-width: 0 }
+.vgrid .cell.cur { grid-row: 1 / 3; grid-column: 1 }
+.vgrid .cell:not(.cur) { grid-column: auto }
+.vgrid.hpg .cell:nth-child(2) { grid-column: 2; grid-row: 1 }
+.vgrid.hpg .cell:nth-child(3) { grid-column: 2; grid-row: 2 }
+.vgrid .cell .fld { width: 100%; min-width: 0; text-align: center; font-size: 16px; font-weight: 700; border-bottom: 1px solid #6b6873; padding: 0 0 1px; height: 22px }
+.vgrid .cell.cur .fld { font-size: 30px; font-weight: 800; height: 40px }
+.vgrid .cell .cap { font-size: 8.5px; padding-top: 2px; line-height: 1; text-align: left }
+.vgrid .cell.cur .cap { text-align: center }
+.vcol.ds .cell { align-items: center }
+.vcol.ds .row { display: flex; gap: 8px; height: 22px; align-items: center }
+.vcol.ds .cap { text-align: center; margin: 0 }
+
+/* ===== Wrapping fields ===== */
+textarea.fld.wrap { display: block; resize: none; overflow: hidden; line-height: 1.08; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--f-ui); padding-top: 1px; height: 18px }
+.tbl td { vertical-align: bottom }
+.tbl td textarea.fld { height: auto }
+.strip { align-items: flex-end }
+.strip label { align-items: flex-end }
+.strip { --mh: 27px }
+.stat textarea.fld { --mh: 40px; font-size: 20px; font-weight: 800; border: 0; text-align: center; margin-top: 3px }
+.stat .val { margin-top: 6px }
+.ident { --mh: 30px }
+.ident textarea.fld { font-size: 15px; font-weight: 600 }
+.att textarea.fld, .align textarea.fld { --mh: 30px }
+.align textarea.fld { font-size: 15px; font-weight: 700 }
+.ident { flex: 0 0 300px !important }
+.vit { grid-template-columns: 1.6fr 1fr 1fr !important }
+.vit > .vcol { padding: 8px 10px 7px }
+.vit .ttl { height: 26px; font-size: 12px }
+.vgrid { row-gap: 2px }
+.vgrid .cell .fld { height: 20px; font-size: 15px }
+.vgrid .cell.cur .fld { height: 38px; font-size: 28px }
+.vgrid .cell .cap { font-size: 8px; padding-top: 2px }
+.vcol.ds .row { height: 20px }
+.slots .sl { grid-template-columns: 36px 20px minmax(0, 1fr) }
+.slots .sl .cap { font-size: 8.5px }
+.slots .dia { width: 10.5px; height: 10.5px }
+.slots .sl .ds { gap: 1.5px; flex-wrap: nowrap }
+.slots .sl .cap { white-space: nowrap; letter-spacing: 0 }
+.slots .grid { column-gap: 12px }
+
+/* ===== Line breaks in wrapping fields ===== */
+.strip { --mh: 40px }
+.stat textarea.fld { --mh: 44px }
+.ident, .att textarea.fld, .align textarea.fld { --mh: 32px }
+
+/* ===== Ability block alignment ===== */
+.fr-ability .amod { height: 50px; margin: 2px 0 19px }
+.fr-ability .amod .circ { width: 50px; height: 50px; margin-left: 3px }
+.fr-ability .amod .circ b { font-size: 23px; line-height: 1 }
+.fr-ability .amod .circ i { bottom: -13px; font-size: 7px; letter-spacing: .12em }
+.fr-ability .amod .tab { height: 38px; padding: 6px 15px 6px 12px; justify-content: center; gap: 1px; align-items: flex-end }
+.fr-ability .amod .tab .fld { font-size: 17px; line-height: 1; height: 19px; margin: 0; text-align: right; width: 34px; padding: 0 2px 0 0 }
+.fr-ability .amod .tab .cap { font-size: 7px; line-height: 1; margin: 0; align-self: flex-end }
+
+/* ===== Spell slots: unavailable = small dashed grey star ===== */
+.dia.off {
+  opacity: 1 !important; transform: scale(.82);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='none' stroke='%23b4b2b0' stroke-width='1.3' stroke-dasharray='2 2' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+.abl .sk { padding-left: 3px }
+
+/* ===== Score tab: value centred in the tab, SCORE label under it (like MODIFIER) ===== */
+.fr-ability .amod .tab { position: relative; height: 38px; padding: 5px 10px 0 6px; flex-direction: row; align-items: center; justify-content: center }
+.fr-ability .amod .tab .fld { width: 100%; height: 26px; font-size: 21px; font-weight: 800; line-height: 1; text-align: center; padding: 0 }
+.fr-ability .amod .tab .cap { position: absolute; right: 12px; bottom: -14px; font-size: 7px; letter-spacing: .12em; margin: 0 }
+.fr-ability .amod .tab .cap { right: auto; left: 50%; transform: translateX(-40%) }
+
+/* ===== Stat boxes: every value centred in the space under the title ===== */
+.stat .val, .stat textarea.fld { margin: auto 0 !important; font: 800 24px/1.05 var(--f-ui); color: var(--ink); text-align: center; width: 100% }
+.stat textarea.fld { padding: 0; border: 0 }
+.stat .ttl { margin-bottom: 0 }
+textarea.fld.wrap { overflow-wrap: normal; word-break: normal }
+.stat textarea.fld { padding: 0 11px !important; box-sizing: border-box }
+.stat textarea.fld { padding: 0 !important; width: calc(100% - 22px) !important; margin: auto 11px !important }
+/* character name: shrink further before wrapping to a second line */
+textarea.fld.wrap.namefld { --mh: 40px; --shrink: .74; font-family: var(--f-name); font-size: 25px; font-weight: 700; letter-spacing: .02em; line-height: 1.05; border-bottom: 0 }
+textarea.fld.wrap.namefld { --mh: 34px; line-height: 1 }
+.divider span { white-space: nowrap; flex: none }
+.ident.framed { gap: 2px }
+
+/* ===== Weapons & Damage Cantrips, laid out like D&D Beyond's Actions list ===== */
+.weapons .tbl.atk col.c1 { width: 30% } .weapons .tbl.atk col.c2 { width: 14% } .weapons .tbl.atk col.c3 { width: 12% } .weapons .tbl.atk col.c4 { width: 16% }
+.weapons .tbl.atk th { font: 700 8.5px var(--f-label); letter-spacing: .1em; text-transform: uppercase; text-decoration: none; color: #4a4850; padding-bottom: 3px; border-bottom: 1px solid #a3a29f }
+.weapons .tbl.atk td { border-bottom: 1px solid #d3d1cd; padding-block: 1px }
+.weapons .tbl.atk td .fld { border-bottom: 0 }
+.weapons .tbl.atk tbody tr:last-child td { border-bottom: 0 }
+.tbl.atk .stack { display: flex; flex-direction: column; justify-content: center; height: calc(var(--rh) - 2px); gap: 0 }
+.tbl.atk textarea.aname { --mh: 17px; font-size: 13px; font-weight: 700; padding: 0 }
+.tbl.atk .asub { font-family: var(--f-ui); font-weight: 500; line-height: 1.1; color: #6b6873; height: 11px !important; padding: 0 !important; letter-spacing: .02em }
+.tbl.atk .adice { font: 800 14px/1 var(--f-ui) !important; height: 16px !important; padding: 0 !important }
+.tbl.atk textarea.arange { --mh: 26px; font-size: 12px; font-weight: 700 }
+.tbl.atk textarea.anotes { --mh: 26px; font-size: 11px; font-weight: 500 }
+.tbl.atk td.hitc { padding-inline: 6px }
+.tbl.atk .hbox { border: 1.4px solid #8d8c8a; border-radius: 4px; background: #fff; height: calc(var(--rh) - 6px); display: flex; align-items: center; justify-content: center; padding: 0 2px }
+.tbl.atk textarea.ahit { --mh: 24px; font-size: 15px; font-weight: 800; border: 0 !important; text-align: center }
+.tbl.atk tbody tr:has(.aname:placeholder-shown) .hbox { border-style: dashed; border-color: #c4c2bf }
+.tbl.atk td { vertical-align: middle }
+.weapons { position: relative }
+.weapons .apa { position: absolute; top: 9px; right: 14px; display: flex; align-items: baseline; gap: 4px; z-index: 2 }
+.weapons .apa .cap { font-size: 7.5px; letter-spacing: .08em; color: #4a4850 }
+.weapons .apa .fld { width: 20px; font-size: 12px; font-weight: 800; padding: 0; border-bottom: 1px solid #8d8c8a }
+.weapons.framed > .apa { position: absolute; top: 12px; right: 16px }
+@media print { .tbl.atk tbody tr:has(.aname:placeholder-shown) .hbox { border-style: solid; border-color: #b4b2b0 } }
+.weapons .tbl.atk th.nth { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px }
+.weapons .tbl.atk th .apa { position: static; display: flex; align-items: baseline; gap: 3px; text-transform: none }
+.weapons .tbl.atk th .apa .cap { font-size: 7px; letter-spacing: .06em; white-space: nowrap }
+.weapons .tbl.atk th .apa .fld { width: 16px; height: 13px; font-size: 11px; font-weight: 800; padding: 0; border-bottom: 1px solid #8d8c8a; text-align: center }
+.weapons .tbl.atk th.nth { padding-right: 8px }
+.features .rich p { break-inside: auto }
+
+/* ===== Limited-use trackers inside feature text ===== */
+span.uses { display: inline-flex; align-items: center; gap: 1.5px; vertical-align: -1px; margin: 0 2px; white-space: nowrap; cursor: pointer; user-select: none }
+span.uses i { width: 10px; height: 10px; display: inline-block; font-style: normal;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='%23fff' stroke='%231c1c1c' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/svg%3E") }
+span.uses i.on { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='%238c2129' stroke='%238c2129' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/svg%3E") }
+span.uses em { font: 700 7.5px/1 var(--f-label); letter-spacing: .08em; color: #6b6873; font-style: normal; margin-left: 2px; text-transform: uppercase }
+span.uses.pool u { display: inline-block; width: 22px; border-bottom: 1px solid #1c1c1c; height: 9px; text-decoration: none }
+.locked span.uses { pointer-events: none }
+.trk-blank span.uses i.on { opacity: .45 }
+@media print {
+  .trk-blank span.uses i.on { opacity: 1; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='%23fff' stroke='%231c1c1c' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/svg%3E") }
+}
+
+/* ===== Table header with an inline field (Notes + Attacks/Action, Max Prepared) ===== */
+.tbl th.nth { display: table-cell !important; padding-right: 6px }
+.tbl th .thf { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px }
+.tbl th .apa { position: static !important; display: flex; align-items: flex-end; gap: 3px; text-transform: none; text-decoration: none }
+.tbl th .apa .cap { font: 700 7px/1 var(--f-label); letter-spacing: .06em; white-space: nowrap; color: #4a4850; padding-bottom: 2px }
+.tbl th .apa .fld { width: 18px; height: 14px; font-size: 11px; font-weight: 800; padding: 0; border-bottom: 1px solid #8d8c8a; text-align: center }
+
+/* ===== Spells: prepared column ===== */
+.spellsbox .tbl col.pc { width: 26px }
+.spellsbox .tbl col.nt { width: 140px }
+.tbl.spl td.pc { text-align: center; padding: 0 }
+.tbl.spl td.pc .dia { width: 12px; height: 12px; vertical-align: middle }
+.tbl.spl .dia.ap { display: inline-block; cursor: default; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.2Q11.4 8.6 18.8 10Q11.4 11.4 10 18.8Q8.6 11.4 1.2 10Q8.6 8.6 10 1.2Z' fill='%231c1c1c' stroke='%231c1c1c' stroke-width='1.7' stroke-linejoin='round'/%3E%3C/svg%3E") !important }
+.tbl.spl .cantrip { color: #a3a29f; font-weight: 700; font-size: 11px }
+.tbl.spl th { white-space: normal }
+.weapons .tbl.atk col.c1 { width: 27% } .weapons .tbl.atk col.c2 { width: 13% } .weapons .tbl.atk col.c3 { width: 11% } .weapons .tbl.atk col.c4 { width: 15% }
+.spellsbox .tbl col.nt { width: 156px }
+.tbl th .thf { min-width: 0 }
+.weapons .tbl.atk col.c1 { width: 25% } .weapons .tbl.atk col.c2 { width: 14% } .weapons .tbl.atk col.c3 { width: 12% }
+.spellsbox .tbl col.cc { width: 82px }
+.tbl.atk input.asub { font-size: 8.5px }
+.tbl.atk .asub { font: 500 8.5px/1.1 var(--f-ui) }
+.spellsbox .tbl col.cc { width: 98px } .spellsbox .tbl col.nt { width: 142px }
+.tbl.atk .asub { font-weight: 500 !important; color: #6b6873 !important }
+
+/* ===== Spell limits in the title row ===== */
+.spellsbox.framed > .splim { position: absolute; top: 7px; display: flex; align-items: center; gap: 6px; z-index: 2 }
+.spellsbox > .splim.l { left: 16px } .spellsbox > .splim.r { right: 16px; flex-direction: row-reverse }
+.spellsbox > .splim .cap { font: 700 7.5px/1.05 var(--f-label); letter-spacing: .08em; color: #4a4850 }
+.spellsbox > .splim.r .cap { text-align: right }
+.spellsbox > .splim textarea.fld { --mh: 22px; --shrink: .6; width: 40px; height: 22px; font-size: 15px; font-weight: 800; text-align: center; border: 1.4px solid #8d8c8a !important; border-radius: 4px; background: #fff; padding: 2px 2px 0 }
+
+/* ===== Too-full boxes scroll on screen so nothing is out of reach ===== */
+@media screen {
+  .rich.over { overflow-y: auto !important; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #8c2129 transparent; box-shadow: inset 0 0 0 1.5px rgba(140,33,41,.55) !important; border-radius: 3px }
+  .features .rich.over { columns: 1 !important }
+  .rich.over::after { content: "Too full to print — scroll to see it all"; position: sticky; bottom: 0; display: block; margin-top: 6px; padding: 3px 6px; background: #8c2129; color: #fff; font: 700 8.5px/1.2 var(--f-ui); letter-spacing: .04em; text-align: center; border-radius: 3px; pointer-events: none }
+}
+@media print { .rich.over { overflow: hidden !important } }
+
+/* ===== Narrower score tab, circle + tab centred as a pair ===== */
+.fr-ability .amod { justify-content: center; padding-right: 4px }
+.fr-ability .amod .tab { flex: 0 0 56px; width: 56px; padding: 5px 8px 0 4px }
+
+/* ===== No-spellcasting page 2: personal boxes, then Features & Traits ===== */
+.p2lite { padding: 30px 32px 40px }
+.p2l { display: grid; grid-template-columns: 1fr 1fr 0.9fr; gap: 8px; height: 400px; margin-bottom: 22px }
+.p2l-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0 }
+.p2l-col > .box { flex: 1 }
+.p2l .appear { flex: 1; height: auto }
+.p2l .langs { flex: none; height: 84px }
+.p2l .coins { flex: none; height: 84px }
+.p2l .equip { height: auto }
+.p2lite > h2 { margin-top: 0 }
+@page p2lite { size: letter; margin: .45in 0 }
+@media print {
+  .page.flow.p2lite { page: p2lite; width: 816px !important; padding: 0 44px; background: #fff }
+  .p2lite > .rich { width: auto !important }
+}
+@media screen { .page.flow.p2lite { background-color: #e7e6e3 } }
+
+/* Features & Traits area on white; the boxes keep the grey sheet band */
+@media screen {
+  .page.flow.p2lite { background: #fbfaf8 !important }
+  .p2lite > .p2l { background: #e7e6e3; margin: -30px -32px 22px; padding: 30px 32px 16px; height: 446px; border-bottom: 1px solid #d3d1cd }
+}
+@media print { .p2lite > .p2l { background: none; margin: 0 0 22px; padding: 0; height: 400px } }
+.page.flow { background: #fbfaf8 }
+@media print { .page.flow { background: #fff !important } }
+
+/* ===== Formatting bar (screen only) ===== */
+.fmt { position: fixed; z-index: 30; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--bar); border: 1px solid var(--btn-line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.18) }
+.fmt[hidden] { display: none !important }
+.fmt button { min-width: 30px; height: 28px; border: 0; border-radius: 5px; background: transparent; color: var(--btn-fg); font: 600 13px var(--f-ui); cursor: pointer; padding: 0 6px }
+.fmt button:hover { background: var(--btn) }
+.fmt button[aria-pressed="true"] { background: var(--focus); color: var(--bar) }
+.fmt .sep { width: 1px; height: 18px; background: var(--btn-line); margin: 0 3px }
+.fmt sub { font-size: 8px }
+@media print { .fmt { display: none !important } }
+/* headings typed into boxes */
+.rich h4, .rich h3 { font: 700 1.08em/1.2 var(--f-ui); color: #16203f; margin: .35em 0 .15em; letter-spacing: .01em }
+.rich h4:first-child, .rich h3:first-child { margin-top: 0 }
+/* section titles typed into boxes match the reference-page style */
+.rich h3 { font: 700 .95em/1.2 var(--f-label) !important; letter-spacing: .12em; text-transform: uppercase; color: #8c2129 !important; border-bottom: 1px solid #b9b5bd; padding-bottom: 2px; margin: .5em 0 .3em }
+.fmt .sec-btn { color: #8c2129; font-weight: 800 }
+.fmt .sec-btn[aria-pressed="true"] { color: var(--bar) }
+
+/* ===== Portrait in the header ===== */
+.portrait { flex: 0 0 92px; position: relative; cursor: pointer }
+.portrait img, .portrait .ph { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: cover; object-position: center 20%;
+  border-radius: 50% 50% 4px 4px / 40% 40% 4px 4px; z-index: 0 }
+.portrait .ph { display: grid; place-items: center; text-align: center; font: 600 10px/1.2 var(--f-ui); color: #a3a29f; background: #fff; border: 1.5px dashed #c4c2bf }
+.portrait.framed > svg.frame { z-index: 2 }
+.portrait.framed > img, .portrait.framed > .ph { position: absolute }
+.locked .portrait { cursor: default }
+.hdr.with-portrait .ident { flex: 0 0 236px !important }
+.hdr.with-portrait .lvl { flex-basis: 66px }
+.hdr.with-portrait .ac { flex-basis: 78px }
+@media print { .portrait .ph { font-size: 0; border: 0 } }
+.portrait img { touch-action: none; cursor: grab } .locked .portrait img { cursor: default }
+/* keep the identity box inside its frame: one line per field (two small lines if needed) */
+.ident textarea.fld:not(.namefld) { --mh: 22px }
+textarea.fld.wrap.namefld { --mh: 30px }
+.ident.framed { gap: 1px; padding-block: 6px }
+.hdr.with-portrait .vgrid.hpg { grid-template-columns: minmax(0, 1fr) 44px; column-gap: 6px }
+.hdr.with-portrait .vgrid .cell .cap { font-size: 7.5px; letter-spacing: .06em }
+</style>
+
+</head>
+<body>
+<header class="bar">
+  <div class="brand">Sheet<span>wright</span></div>
+  <select id="pick" aria-label="Choose character"></select>
+  <button class="btn primary" id="bImport">Import</button>
+  <button class="btn" id="bExport">Export</button>
+  <button class="btn" id="bPrint">Print / PDF</button>
+  <button class="btn" id="bLock" aria-pressed="false">Editing</button>
+  <button class="btn" id="bAvatar" aria-pressed="false" title="Show or hide the character portrait in the header. Drag the picture to reposition it; click it to choose a different one.">Portrait</button>
+  <button class="btn" id="bTrk" aria-pressed="true" title="Print current HP, temp HP, spent hit dice, death saves, inspiration, used spell slots, coins and XP as blanks, ready for pencil or dry-erase. Values that won't print show in light grey.">Blank trackers</button>
+  <button class="btn" id="bSpells" aria-pressed="true" title="Show or hide the spellcasting page for this character. When hidden, Features & Traits starts on page 2.">Spellcasting</button>
+  <button class="btn" id="bRef" aria-pressed="true" title="Add full-text Features, Spell and Notes pages after the sheet">Reference pages</button>
+  <button class="btn" id="bDelete" hidden>Delete</button>
+  <span class="grow"></span>
+  <span class="status" id="status" role="status"></span>
+</header>
+<main class="desk" id="desk"></main>
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="avatarFile" accept="image/*" hidden>
+<div class="fmt" id="fmt" role="toolbar" aria-label="Text formatting" hidden>
+  <button data-cmd="bold" title="Bold (Ctrl/⌘+B)"><b>B</b></button>
+  <button data-cmd="italic" title="Italic (Ctrl/⌘+I)"><i>I</i></button>
+  <button data-cmd="underline" title="Underline (Ctrl/⌘+U)"><u>U</u></button>
+  <span class="sep"></span>
+  <button data-cmd="section" title="Section title (red, underlined)" class="sec-btn">§</button>
+  <button data-cmd="heading" title="Heading line">H</button>
+  <button data-cmd="insertUnorderedList" title="Bullet list">•≡</button>
+  <button data-cmd="insertOrderedList" title="Numbered list">1≡</button>
+  <span class="sep"></span>
+  <button data-cmd="tracker" title="Insert a use tracker (stars to tick off). Shift-click a star to add one, Alt-click to remove one.">✧✧</button>
+  <button data-cmd="removeFormat" title="Clear formatting">T<sub>×</sub></button>
+</div>
+
+<dialog id="dlgImport" aria-labelledby="imT">
+  <div class="dlg">
+    <h2 id="imT">Import from D&amp;D Beyond</h2>
+    <div class="step">
+      <span class="n">One-time setup</span>
+      <p>Drag this button onto your browser's bookmarks bar:</p>
+      <a class="bmk" id="bmk" href="#">⇩ Copy D&amp;D Character</a>
+      <p style="font-size:13px;opacity:.8">Can't drag it? <button class="btn" id="bCopyBm" style="min-height:28px;padding:3px 10px">Copy bookmarklet code</button>, create a new bookmark, and paste the code as its URL. If you use Tampermonkey you can <button class="btn" id="bCopyUs" style="min-height:28px;padding:3px 10px">copy the userscript</button> instead. It adds a button to every character page.</p>
+    </div>
+    <div class="step">
+      <span class="n">Each time</span>
+      <ol>
+        <li>Open your character on dndbeyond.com, signed in. Any tab works.</li>
+        <li>Click the <b>Copy D&amp;D Character</b> bookmark. It copies the full character data.</li>
+        <li>Come back here and paste with Ctrl+V / ⌘V into the box below.</li>
+      </ol>
+      <textarea id="paste" placeholder="Paste here. You can also drop a .json file anywhere on this dialog." aria-label="Paste character JSON"></textarea>
+      <div class="row">
+        <button class="btn primary" id="bLoad">Import</button>
+        <label class="btn">Choose .json file…<input type="file" id="file" accept=".json,application/json" hidden></label>
+        <button class="btn primary" id="bReplace" hidden>Replace it</button>
+        <span class="grow"></span>
+        <button class="btn" id="bCloseIm">Close</button>
+      </div>
+      <div class="msg" id="imMsg" role="alert"></div>
+    </div>
+    <p style="font-size:13px;opacity:.75">Your sheets are stored only in this browser. Re-import any time to pick up level-ups. Exported sheet files can be imported here too.</p>
+  </div>
+</dialog>
+
+<dialog id="dlgExport" aria-labelledby="exT">
+  <div class="dlg">
+    <h2 id="exT">Export this sheet</h2>
+    <p>Save a copy of the sheet, including your edits. You can import it into Sheetwright on another computer.</p>
+    <div class="row">
+      <button class="btn primary" id="bExCopy">Copy sheet JSON</button>
+      <button class="btn" id="bExDl">Download .json</button>
+      <span class="grow"></span>
+      <button class="btn" id="bCloseEx">Close</button>
+    </div>
+    <p id="printNote" hidden style="font-size:13px;opacity:.8">This hosted version can't open the print dialog or save files. To print or save a PDF, open the downloadable <code>sheetwright.html</code> file in Chrome and import this JSON there.</p>
+    <textarea id="fallback" hidden readonly aria-label="Copy this text"></textarea>
+  </div>
+</dialog>
+
+<dialog id="dlgDelete" aria-labelledby="delT">
+  <div class="dlg">
+    <h2 id="delT">Delete <span id="delName"></span>?</h2>
+    <p>This removes the sheet and your edits from this browser. You can import it again from D&amp;D Beyond later.</p>
+    <div class="row"><button class="btn primary" id="bDelYes">Delete</button><button class="btn" id="bDelNo">Cancel</button></div>
+  </div>
+</dialog>
+
+<script>/* ===== D&D Beyond → Sheet model parser ===== */
+const DDBParse = (() => {
+  const AB = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+  const AB_FULL = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
+  const SKILLS = { acrobatics: 'dex', 'animal-handling': 'wis', arcana: 'int', athletics: 'str', deception: 'cha', history: 'int', insight: 'wis', intimidation: 'cha', investigation: 'int', medicine: 'wis', nature: 'int', perception: 'wis', performance: 'cha', persuasion: 'cha', religion: 'int', 'sleight-of-hand': 'dex', stealth: 'dex', survival: 'wis' };
+  const WEAPONS = 'club dagger greatclub handaxe javelin light-hammer mace quarterstaff sickle spear dart light-crossbow shortbow sling battleaxe flail glaive greataxe greatsword halberd lance longsword maul morningstar pike rapier scimitar shortsword trident warhammer war-pick whip blowgun hand-crossbow heavy-crossbow longbow musket pistol net firearms'.split(' ');
+  const ALIGN = { 1: 'Lawful Good', 2: 'Neutral Good', 3: 'Chaotic Good', 4: 'Lawful Neutral', 5: 'True Neutral', 6: 'Chaotic Neutral', 7: 'Lawful Evil', 8: 'Neutral Evil', 9: 'Chaotic Evil' };
+  const SIZE = { 2: 'Tiny', 3: 'Small', 4: 'Medium', 5: 'Large', 6: 'Huge', 7: 'Gargantuan' };
+  const ACT = { 1: 'Action', 2: '—', 3: 'Bonus', 4: 'Reaction', 5: 'sec', 6: 'min', 7: 'hr', 8: 'Special' };
+  // full-caster multiclass slot table (caster level 1..20)
+  const MC = [[], [2], [3], [4, 2], [4, 3], [4, 3, 2], [4, 3, 3], [4, 3, 3, 1], [4, 3, 3, 2], [4, 3, 3, 3, 1], [4, 3, 3, 3, 2], [4, 3, 3, 3, 2, 1], [4, 3, 3, 3, 2, 1], [4, 3, 3, 3, 2, 1, 1], [4, 3, 3, 3, 2, 1, 1], [4, 3, 3, 3, 2, 1, 1, 1], [4, 3, 3, 3, 2, 1, 1, 1], [4, 3, 3, 3, 2, 1, 1, 1, 1], [4, 3, 3, 3, 3, 1, 1, 1, 1], [4, 3, 3, 3, 3, 2, 1, 1, 1], [4, 3, 3, 3, 3, 2, 2, 1, 1]];
+
+  const mod = s => Math.floor((s - 10) / 2);
+  const sgn = n => (n >= 0 ? '+' : '') + n;
+  const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function htmlToText(html) {
+    if (!html) return '';
+    const d = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html');
+    d.querySelectorAll('p,li,br,tr,h1,h2,h3,h4,h5,h6').forEach(e => e.append(' '));
+    return d.body.textContent.replace(/\s+/g, ' ').trim();
+  }
+  // Keep a safe subset of tags
+  function cleanHtml(html) {
+    if (!html) return '';
+    const doc = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html');
+    const ok = { P: 1, BR: 1, STRONG: 1, B: 1, EM: 1, I: 1, UL: 1, OL: 1, LI: 1, TABLE: 1, THEAD: 1, TBODY: 1, TR: 1, TD: 1, TH: 1, SPAN: 1, DIV: 1 };
+    const walk = el => {
+      [...el.children].forEach(c => {
+        walk(c);
+        if (/^H\d$/.test(c.tagName)) { const p = doc.createElement('p'); const s = doc.createElement('strong'); s.append(...c.childNodes); p.append(s); c.replaceWith(p); return; }
+        if (/^(SCRIPT|STYLE|IFRAME|OBJECT|TEMPLATE)$/.test(c.tagName)) { c.remove(); return; }
+        if (!ok[c.tagName]) { c.replaceWith(...c.childNodes); return; }
+        [...c.attributes].forEach(a => c.removeAttribute(a.name));
+      });
+    };
+    const root = doc.body.firstChild; walk(root);
+    return root.innerHTML.replace(/<p>\s*(&nbsp;)?\s*<\/p>/g, '').trim();
+  }
+
+  // inline use-tracker chip stored in rich text: <span class="uses" data-n data-used data-reset>
+  const usesChip = u => `<span class="uses" contenteditable="false" data-n="${u.n}" data-used="${u.used || 0}" data-reset="${esc(u.reset || '')}"></span>`;
+  function parse(raw) {
+    const d = raw.data || raw;
+    if (!d || !d.stats || !d.classes) throw new Error('This does not look like D&D Beyond character JSON.');
+
+    const classes = d.classes.slice().sort((a, b) => (b.isStartingClass - a.isStartingClass) || b.level - a.level);
+    const totalLevel = classes.reduce((s, c) => s + c.level, 0) || 1;
+    const pb = Math.ceil(totalLevel / 4) + 1;
+
+    // ---- which class features exist (for multiclass-only modifiers & token resolution)
+    const featClass = {};
+    classes.forEach(c => {
+      (c.classFeatures || []).forEach(f => featClass[f.definition.id] = c);
+      (c.subclassDefinition?.classFeatures || []).forEach(f => featClass[f.definition.id] = c);
+    });
+    // ---- collect active modifiers
+    const inv = d.inventory || [];
+    const itemByDef = {}; inv.forEach(i => { (itemByDef[i.definition.id] ||= []).push(i); });
+    const itemActive = i => i.equipped && (!i.definition.canAttune || i.isAttuned);
+    const mods = [];
+    for (const [src, arr] of Object.entries(d.modifiers || {})) for (const m of arr || []) {
+      if (src === 'item') { const its = itemByDef[m.componentId] || []; if (!its.some(itemActive)) continue; }
+      if (src === 'class' && m.availableToMulticlass === false && classes.length > 1) {
+        const c = featClass[m.componentId]; if (c && !c.isStartingClass) continue;
+      }
+      mods.push(m);
+    }
+    const find = (type, sub) => mods.filter(m => m.type === type && (sub == null || m.subType === sub));
+    const has = (type, sub) => find(type, sub).length > 0;
+
+    // ---- ability scores
+    const scores = {};
+    AB.forEach((k, i) => {
+      const id = i + 1;
+      const base = d.stats.find(s => s.id === id)?.value ?? 10;
+      const bonus = d.bonusStats.find(s => s.id === id)?.value ?? 0;
+      const over = d.overrideStats.find(s => s.id === id)?.value;
+      let v = base + bonus + find('bonus', AB_FULL[i] + '-score').reduce((s, m) => s + (m.value ?? 0), 0);
+      find('set', AB_FULL[i] + '-score').forEach(m => { if (m.value > v) v = m.value; });
+      scores[k] = over ?? v;
+    });
+    const M = k => mod(scores[k]);
+    const val = m => (m.statId ? M(AB[m.statId - 1]) : (m.value ?? m.fixedValue ?? 0));
+    // limited uses: base + ability modifier and/or proficiency bonus, as D&D Beyond computes them
+    const RESET = { 1: 'SR', 2: 'LR', 3: 'Dawn', 4: 'Rest' };
+    const usesOf = lu => {
+      if (!lu) return 0;
+      let n = lu.maxUses || 0;
+      if (lu.statModifierUsesId) { const m = M(AB[lu.statModifierUsesId - 1]); n = lu.operator === 2 ? n * m : n + m; }
+      if (lu.useProficiencyBonus) n = lu.proficiencyBonusOperator === 2 ? (n || 1) * pb : n + pb;
+      return (lu.statModifierUsesId || lu.useProficiencyBonus) ? Math.max(1, n) : n;
+    };
+    const resetOf = lu => RESET[lu?.resetType] || (lu?.resetTypeDescription || '').replace(/^(Short|Long) Rest$/, (_, a) => a[0] + 'R');
+
+    // ---- token resolution for DDB snippets
+    const resolve = (txt, clsLevel) => String(txt || '').replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
+      let [e, fmt] = expr.split('#'); let round = null;
+      e = e.replace(/@(roundup|rounddown|min:\d+|max:\d+)/g, (_, r) => { round = r; return ''; });
+      e = e.replace(/proficiency/g, pb).replace(/characterlevel/g, totalLevel).replace(/classlevel/g, clsLevel || totalLevel)
+        .replace(/modifier:(\w+)/g, (_, a) => M(a.slice(0, 3))).replace(/savedc:(\w+)/g, (_, a) => 8 + pb + M(a.slice(0, 3)))
+        .replace(/scalevalue|limiteduse|fixedvalue|spellattack:\w+/g, '?');
+      if (!/^[\d+\-*/(). ]+$/.test(e)) return '—';
+      let n; try { n = Function('return (' + e + ')')(); } catch { return '—'; }
+      if (round === 'roundup') n = Math.ceil(n); else n = Math.floor(n);
+      if (round && round.startsWith('min:')) n = Math.max(n, +round.slice(4));
+      if (round && round.startsWith('max:')) n = Math.min(n, +round.slice(4));
+      return fmt === 'signed' ? sgn(n) : String(n);
+    });
+    const summary = (def, lvl) => {
+      let s = resolve(htmlToText(def.snippet), lvl);
+      if (!s) {
+        s = resolve(htmlToText(def.description), lvl);
+        if (s.length > 240) { const cut = s.slice(0, 240); const dot = cut.lastIndexOf('. '); s = (dot > 80 ? cut.slice(0, dot + 1) : cut.replace(/\s\S*$/, '') + '…'); }
+      }
+      return s;
+    };
+
+    // ---- saves & skills
+    const abilities = {};
+    AB.forEach((k, i) => {
+      abilities[k] = { score: scores[k], save: has('proficiency', AB_FULL[i] + '-saving-throws'),
+        saveBonus: find('bonus', 'saving-throws').reduce((s, m) => s + val(m), 0) + find('bonus', AB_FULL[i] + '-saving-throws').reduce((s, m) => s + val(m), 0) };
+    });
+    const half = has('half-proficiency', 'ability-checks');
+    const skills = {};
+    Object.keys(SKILLS).forEach(sk => {
+      let p = has('expertise', sk) ? 2 : has('proficiency', sk) ? 1 : (half || has('half-proficiency', sk)) ? 0.5 : 0;
+      skills[sk] = { prof: p, bonus: find('bonus', sk).reduce((s, m) => s + val(m), 0) + find('bonus', 'ability-checks').reduce((s, m) => s + val(m), 0) };
+    });
+    // character value overrides (typeId 26 = skill proficiency level override is uncommon; ignore)
+
+    // ---- AC
+    const eq = inv.filter(i => i.equipped);
+    const armor = eq.find(i => [1, 2, 3].includes(i.definition.armorTypeId));
+    const shield = eq.find(i => i.definition.armorTypeId === 4);
+    let ac;
+    if (armor) {
+      const t = armor.definition.armorTypeId;
+      ac = armor.definition.armorClass + (t === 1 ? M('dex') : t === 2 ? Math.min(M('dex'), 2 + find('set', 'ac-max-dex-modifier').reduce((s, m) => Math.max(s, (m.value || 2) - 2), 0)) : 0);
+      ac += find('bonus', 'armored-armor-class').reduce((s, m) => s + val(m), 0);
+    } else {
+      ac = 10 + M('dex');
+      find('set', 'unarmored-armor-class').forEach(m => {
+        const alt = m.statId ? 10 + M('dex') + M(AB[m.statId - 1]) : (m.value || 10) + M('dex');
+        if (alt > ac) ac = alt;
+      });
+      ac += find('bonus', 'unarmored-armor-class').reduce((s, m) => s + val(m), 0);
+    }
+    if (shield) ac += shield.definition.armorClass || 2;
+    ac += find('bonus', 'armor-class').reduce((s, m) => s + val(m), 0);
+    const acOverride = (d.characterValues || []).find(v => v.typeId === 1 && v.value != null);
+    if (acOverride) ac = acOverride.value;
+
+    // ---- HP
+    const conHp = M('con') * totalLevel;
+    const perLvl = find('bonus', 'hit-points-per-level').reduce((s, m) => s + val(m), 0) * totalLevel;
+    const hpMax = d.overrideHitPoints ?? (d.baseHitPoints + (d.bonusHitPoints || 0) + conHp + perLvl + find('bonus', 'hit-points').reduce((s, m) => s + val(m), 0));
+    const hp = { max: hpMax, current: Math.max(0, hpMax - (d.removedHitPoints || 0)), temp: d.temporaryHitPoints || 0 };
+
+    const hdGroups = {};
+    classes.forEach(c => { hdGroups[c.definition.hitDice] = (hdGroups[c.definition.hitDice] || 0) + c.level; });
+    const hitDice = { max: Object.entries(hdGroups).sort((a, b) => b[0] - a[0]).map(([die, n]) => n + 'd' + die).join('+'), spent: classes.reduce((s, c) => s + (c.hitDiceUsed || 0), 0) };
+
+    // ---- speed / size / init / senses
+    const ws = d.race?.weightSpeeds?.normal || {};
+    let walk = ws.walk || 30;
+    find('set', 'innate-speed-walking').forEach(m => { if (m.value > walk) walk = m.value; });
+    walk += find('bonus', 'speed').reduce((s, m) => s + val(m), 0) + find('bonus', 'speed-walking').reduce((s, m) => s + val(m), 0);
+    if (!armor) walk += find('bonus', 'unarmored-movement').reduce((s, m) => s + val(m), 0);
+    const extra = [];
+    for (const k of ['fly', 'swim', 'climb', 'burrow']) {
+      let v = ws[k] || 0;
+      find('set', 'innate-speed-' + (k === 'fly' ? 'flying' : k === 'swim' ? 'swimming' : k === 'climb' ? 'climbing' : 'burrowing')).forEach(m => { v = Math.max(v, m.value === 0 || m.value == null ? walk : m.value); });
+      if (v) extra.push(k[0].toUpperCase() + k.slice(1) + ' ' + v);
+    }
+    const speed = walk + ' ft.' + (extra.length ? ' (' + extra.join(', ') + ')' : '');
+    const size = d.race?.size || SIZE[d.race?.sizeId] || 'Medium';
+    let initBonus = find('bonus', 'initiative').reduce((s, m) => s + val(m), 0);
+    if (has('proficiency', 'initiative')) initBonus += pb;
+    const senses = [];
+    find('set-base', null).filter(m => /vision|sense|sight/.test(m.subType)).forEach(m => senses.push(m.friendlySubtypeName + ' ' + m.value + ' ft.'));
+    (d.customSenses || []).forEach(s => s.distance && senses.push((s.name || 'Sense') + ' ' + s.distance + ' ft.'));
+    const ppBonus = find('bonus', 'passive-perception').reduce((s, m) => s + val(m), 0);
+
+    // ---- proficiencies & languages
+    const profs = find('proficiency', null).map(m => m.subType);
+    const armorTraining = { light: profs.includes('light-armor'), medium: profs.includes('medium-armor'), heavy: profs.includes('heavy-armor'), shields: profs.includes('shields') };
+    const weaponProfs = [], toolProfs = [];
+    const seen = new Set();
+    find('proficiency', null).forEach(m => {
+      const s = m.subType; if (seen.has(s)) return; seen.add(s);
+      if (SKILLS[s] || /saving-throws$|armor$|^shields$|^initiative$|ability-checks/.test(s)) return;
+      if (s === 'simple-weapons') weaponProfs.unshift('Simple'); else if (s === 'martial-weapons') weaponProfs.push('Martial');
+      else if (WEAPONS.includes(s) || /weapons?$/.test(s)) weaponProfs.push(m.friendlySubtypeName);
+      else toolProfs.push(m.friendlySubtypeName);
+    });
+    const langs = [...new Set(find('language', null).filter(m => !/^select|choose/.test(m.subType)).map(m => m.friendlySubtypeName))];
+
+    // ---- attacks
+    const weaponProf = it => {
+      const base = slug(it.definition.type || it.definition.name);
+      return profs.includes(base) || profs.includes(slug(it.definition.name)) || (it.definition.categoryId === 1 && profs.includes('simple-weapons')) || (it.definition.categoryId === 2 && profs.includes('martial-weapons'));
+    };
+    // ---- weapon mastery (2024): which masteries this character has unlocked, per weapon
+    const MASTERY = {
+      Cleave: 'If you hit a creature with a melee attack roll using this weapon, you can make a melee attack roll with it against a second creature within 5 feet of the first that is also within your reach. On a hit, the second creature takes the weapon\u2019s damage, but don\u2019t add your ability modifier unless it\u2019s negative. Once per turn.',
+      Graze: 'If your attack roll with this weapon misses a creature, you can deal damage to it equal to the ability modifier you used for the attack roll, of the same type the weapon deals.',
+      Nick: 'When you make the extra attack of the Light property, you can make it as part of the Attack action instead of as a Bonus Action. Once per turn.',
+      Push: 'If you hit a creature with this weapon, you can push the creature up to 10 feet straight away from yourself if it is Large or smaller.',
+      Sap: 'If you hit a creature with this weapon, that creature has Disadvantage on its next attack roll before the start of your next turn.',
+      Slow: 'If you hit a creature with this weapon and deal damage to it, you can reduce its Speed by 10 feet until the start of your next turn. This doesn\u2019t stack.',
+      Topple: 'If you hit a creature with this weapon, you can force it to make a Constitution saving throw (DC 8 + the ability modifier used for the attack + your Proficiency Bonus). On a failed save, it has the Prone condition.',
+      Vex: 'If you hit a creature with this weapon and deal damage to it, you have Advantage on your next attack roll against that creature before the end of your next turn.'
+    };
+    const known = new Map(); // mastery -> Set(weapon names)
+    find('weapon-mastery', null).forEach(m => {
+      const mm = String(m.friendlySubtypeName || '').match(/^(\w+)\s*\(([^,)]+)/);
+      const name = mm ? mm[1] : String(m.subType || '').split('-')[0].replace(/^\w/, c => c.toUpperCase());
+      if (!MASTERY[name]) return;
+      (known.get(name) || known.set(name, new Set()).get(name)).add(mm ? mm[2].trim() : '');
+    });
+    const masteryDesc = {}; // prefer D&D Beyond's own wording when an item carries it
+    inv.forEach(i => (i.definition.properties || []).forEach(pr => { if (MASTERY[pr.name] && pr.description && !masteryDesc[pr.name]) masteryDesc[pr.name] = htmlToText(pr.description); }));
+    const hasMastery = (mast, it) => [...(known.get(mast) || [])].some(w => w && [it.definition.type, it.definition.name].some(n => String(n || '').toLowerCase() === w.toLowerCase()));
+    const attacks = [];
+    const wps = inv.filter(i => i.definition.filterType === 'Weapon' && i.definition.damage);
+    (wps.some(i => i.equipped) ? wps.filter(i => i.equipped) : wps).forEach(it => {
+      const df = it.definition; const props = (df.properties || []).map(p => p.name);
+      const ranged = df.attackType === 2;
+      const abil = ranged ? 'dex' : props.includes('Finesse') ? (M('dex') > M('str') ? 'dex' : 'str') : 'str';
+      const magic = (df.grantedModifiers || []).filter(m => m.type === 'bonus' && m.subType === 'magic').reduce((s, m) => s + (m.value || 0), 0);
+      const extraHit = find('bonus', ranged ? 'ranged-weapon-attacks' : 'melee-weapon-attacks').reduce((s, m) => s + val(m), 0) + find('bonus', 'weapon-attacks').reduce((s, m) => s + val(m), 0);
+      const hit = M(abil) + (weaponProf(it) ? pb : 0) + magic + extraHit;
+      const dm = M(abil) + magic;
+      const notes = [];
+      const mast = props.find(p => MASTERY[p] && hasMastery(p, it));
+      if (mast) notes.push('Mastery: ' + mast);
+      props.forEach(p => {
+        if (MASTERY[p]) return;
+        if (p === 'Versatile') { const n = df.properties.find(x => x.name === p).notes; notes.push('Versatile' + (n ? ' (' + n + ')' : '')); }
+        else if (p !== 'Ammunition' && p !== 'Range') notes.push(p);
+      });
+      const reach = props.includes('Reach');
+      const range = (ranged || props.includes('Thrown')) && df.range ? `${df.range} (${df.longRange})` : reach ? '10 ft. Reach' : '5 ft. Reach';
+      attacks.push({ name: it.definition.name + (it.quantity > 1 ? ` (${it.quantity})` : ''), sub: `${ranged ? 'Ranged' : 'Melee'} Weapon${magic ? ' · Magic' : ''}`, range, hit: sgn(hit), damage: `${df.damage.diceString}${dm ? sgn(dm) : ''}`, dtype: df.damageType || '', notes: notes.join(', ') });
+    });
+
+    // merge identical weapon rows
+    for (let i = attacks.length - 1; i > 0; i--) {
+      const j = attacks.findIndex(a => a.name.replace(/ \(\d+\)$/, '') === attacks[i].name && a.hit === attacks[i].hit && a.damage === attacks[i].damage && a.range === attacks[i].range);
+      if (j > -1 && j < i) { const n = (+(attacks[j].name.match(/\((\d+)\)$/) || [0, 1])[1]) + 1; attacks[j].name = attacks[i].name + ` (${n})`; attacks.splice(i, 1); }
+    }
+
+    // ---- spells
+    const featureNames = {};
+    classes.forEach(c => [...(c.classFeatures || []), ...(c.subclassDefinition?.classFeatures || [])].forEach(f => featureNames[f.definition.id] = f.definition.name));
+    (d.race?.racialTraits || []).forEach(t => featureNames[t.definition.id] = t.definition.name);
+    for (const arr of Object.values(d.options || {})) (arr || []).forEach(o => featureNames[o.definition.id] = o.definition.name);
+    (d.feats || []).forEach(f => featureNames[f.definition.id] = f.definition.name);
+    inv.forEach(i => featureNames[i.definition.id] = i.definition.name);
+
+    const fmtRange = r => {
+      if (!r) return '';
+      const aoe = r.aoeType ? `${r.aoeValue}-ft ${r.aoeType}` : '';
+      if (r.origin === 'Ranged') return (r.rangeValue ? r.rangeValue + ' ft' : 'Ranged') + (aoe ? ` (${aoe})` : '');
+      if (r.origin === 'Self') return aoe ? `Self (${aoe})` : 'Self';
+      return r.origin + (aoe ? ` (${aoe})` : '');
+    };
+    const fmtTime = a => !a ? '' : a.activationType === 6 || a.activationType === 7 || a.activationType === 5 ? `${a.activationTime} ${ACT[a.activationType]}` : (ACT[a.activationType] || '');
+    const fmtDur = du => !du ? '' : du.durationType === 'Instantaneous' ? 'Inst.' : du.durationType === 'Time' || du.durationType === 'Concentration' ? `${du.durationInterval} ${du.durationUnit === 'Minute' ? 'min' : du.durationUnit === 'Hour' ? 'hr' : du.durationUnit === 'Round' ? 'rnd' : (du.durationUnit || '').toLowerCase()}` : du.durationType;
+    const spells = []; const spellKeys = new Set();
+    // every spell the character knows; prep: true/false for leveled spells (null for cantrips), ap = always prepared
+    const addSpell = (s, srcLabel, mode) => {
+      const x = s.definition; if (!x) return;
+      const key = x.name + '|' + (srcLabel || '');
+      if (spellKeys.has(key)) return; spellKeys.add(key);
+      const comps = (x.components || []).map(n => ({ 1: 'V', 2: 'S', 3: 'M' }[n])).join(', ');
+      const costly = /gp|consume/i.test(x.componentsDescription || '');
+      const notes = [comps, fmtDur(x.duration)];
+      if (srcLabel) notes.push(srcLabel);
+      const su = usesOf(s.limitedUse); if (su > 0 && su <= 10) notes.push('✧'.repeat(su) + ' /' + (resetOf(s.limitedUse) || 'LR')); else if (su > 10) notes.push(`${su}/${resetOf(s.limitedUse) || 'LR'}`);
+      const ap = !!s.alwaysPrepared || mode === 'always';
+      const prep = x.level === 0 ? null : ap || mode === 'known' || !!s.prepared;
+      spells.push({ level: x.level, p: prep, ap: x.level > 0 && ap, name: x.name, time: fmtTime(x.activation), range: fmtRange(x.range), c: !!x.concentration, r: !!x.ritual, m: costly, notes: notes.filter(Boolean).join(' · '), material: x.componentsDescription || '', desc: cleanHtml(x.description) });
+    };
+    (d.classSpells || []).forEach(cs => {
+      const c = classes.find(k => k.id === cs.characterClassId);
+      const preparer = cs.spells.some(s => s.prepared);
+      cs.spells.forEach(s => addSpell(s, classes.length > 1 && c ? c.definition.name : '', preparer ? 'flag' : 'known'));
+    });
+    for (const [k, arr] of Object.entries(d.spells || {})) (arr || []).forEach(s => {
+      const label = featureNames[s.componentId] || ({ race: d.race?.baseRaceName, item: 'Item', feat: 'Feat', background: 'Background' }[k] || '');
+      addSpell(s, label.replace(/^Pact of the /, '').replace(/ Spells$/, '').replace(/ - .*$/, ''), s.alwaysPrepared || s.limitedUse || k !== 'class' ? 'always' : 'known');
+    });
+    spells.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+
+    // damage cantrips → attack table
+    const spellAbility = (() => {
+      const c = classes.filter(c => c.definition.canCastSpells || c.subclassDefinition?.canCastSpells).sort((a, b) => b.level - a.level)[0];
+      const id = c ? (c.definition.spellCastingAbilityId || c.subclassDefinition?.spellCastingAbilityId) : null;
+      return id ? AB[id - 1] : null;
+    })();
+    const invocs = (d.options?.class || []).map(o => o.definition.name);
+    const allSpellObjs = [...(d.classSpells || []).flatMap(c => c.spells), ...Object.values(d.spells || {}).flat()].filter(Boolean);
+    const cantripSeen = new Set();
+    const spellSource = new Map();
+    (d.classSpells || []).forEach(cs => { const c = classes.find(k => k.id === cs.characterClassId); cs.spells.forEach(s => spellSource.set(s, c?.definition.name || '')); });
+    for (const [k, arr] of Object.entries(d.spells || {})) (arr || []).forEach(s => spellSource.set(s, (featureNames[s.componentId] || { race: d.race?.baseRaceName, item: 'Item', feat: 'Feat' }[k] || '').replace(/ - .*$/, '')));
+    allSpellObjs.filter(s => s.definition?.level === 0).forEach(s => {
+      const x = s.definition; if (cantripSeen.has(x.name)) return;
+      const dmg = (x.modifiers || []).find(m => m.type === 'damage' && m.die);
+      if (!dmg) return; cantripSeen.add(x.name);
+      const ab = s.spellCastingAbilityId ? AB[s.spellCastingAbilityId - 1] : spellAbility || 'int';
+      let dice = dmg.die.diceString;
+      (dmg.atHigherLevels?.higherLevelDefinitions || []).forEach(h => { if (h.level <= totalLevel && h.dice?.diceString) dice = h.dice.diceString; });
+      let note = '';
+      if (x.name === 'Eldritch Blast') {
+        const beams = totalLevel >= 17 ? 4 : totalLevel >= 11 ? 3 : totalLevel >= 5 ? 2 : 1;
+        dice = dmg.die.diceString; note = beams > 1 ? `${beams} beams` : '';
+        if (invocs.includes('Agonizing Blast')) dice += sgn(M(ab));
+      }
+      const hit = x.attackType ? sgn(pb + M(ab)) : x.saveDcAbilityId ? `DC ${8 + pb + M(ab)} ${AB[x.saveDcAbilityId - 1].toUpperCase()}` : '—';
+      const comps = (x.components || []).map(n => ({ 1: 'V', 2: 'S', 3: 'M' }[n])).join('/');
+      const rng = fmtRange(x.range).replace(/ ft\b/, ' ft.');
+      const dt = String(dmg.friendlySubtypeName || dmg.subType || ''); 
+      attacks.push({ name: x.name, sub: ['Cantrip', spellSource.get(s)].filter(Boolean).join(' • '), range: rng, hit, damage: dice, dtype: dt.charAt(0).toUpperCase() + dt.slice(1), notes: [comps, note].filter(Boolean).join(', ') });
+    });
+    attacks.push({ name: 'Unarmed Strike', sub: 'Melee Attack', range: '5 ft. Reach', hit: sgn(M('str') + pb), damage: `${1 + M('str')}`, dtype: 'Bludgeoning', notes: '' });
+    const allFeatNames = classes.flatMap(c => [...(c.classFeatures || []), ...(c.subclassDefinition?.classFeatures || [])].filter(f => f.definition.requiredLevel <= c.level).map(f => f.definition.name));
+    const attacksPerAction = allFeatNames.some(n => /Three Extra Attacks/i.test(n)) ? 4 : allFeatNames.some(n => /Two Extra Attacks/i.test(n)) ? 3 : allFeatNames.some(n => /^Extra Attack/i.test(n)) ? 2 : 1;
+
+    // ---- spell slots
+    const slots = {}; for (let i = 1; i <= 9; i++) slots[i] = { total: 0, expended: 0, pact: false };
+    const casters = classes.filter(c => (c.definition.canCastSpells || c.subclassDefinition?.canCastSpells));
+    const isPact = c => c.definition.name === 'Warlock';
+    const nonPact = casters.filter(c => !isPact(c));
+    const rulesOf = c => (c.subclassDefinition?.canCastSpells && !c.definition.canCastSpells) ? c.subclassDefinition.spellRules : c.definition.spellRules;
+    if (nonPact.length === 1) {
+      const row = rulesOf(nonPact[0])?.levelSpellSlots?.[nonPact[0].level] || [];
+      row.forEach((n, i) => { if (i < 9) slots[i + 1].total += n; });
+    } else if (nonPact.length > 1) {
+      let cl = 0;
+      nonPact.forEach(c => { const r = rulesOf(c); const div = r?.multiClassSpellSlotDivisor || 1; cl += r?.multiClassSpellSlotRounding === 2 ? Math.ceil(c.level / div) : Math.floor(c.level / div); });
+      (MC[Math.min(20, cl)] || []).forEach((n, i) => slots[i + 1].total += n);
+    }
+    (d.spellSlots || []).forEach(s => { if (slots[s.level]) slots[s.level].expended += s.used || 0; });
+    casters.filter(isPact).forEach(c => {
+      const row = c.definition.spellRules?.levelSpellSlots?.[c.level] || [];
+      row.forEach((n, i) => { if (n && i < 9) { slots[i + 1].total += n; slots[i + 1].pact = true; } });
+    });
+    (d.pactMagic || []).forEach(s => { if (slots[s.level]) slots[s.level].expended += s.used || 0; });
+
+    // ---- features
+    const optionsFor = (list, compId) => (list || []).filter(o => o.componentId === compId);
+    const classFeatures = [];
+    classes.forEach(c => {
+      const feats = [...(c.classFeatures || []), ...(c.subclassDefinition?.classFeatures || [])]
+        .filter(f => f.definition.requiredLevel <= c.level && !f.definition.hideInSheet)
+        .sort((a, b) => a.definition.requiredLevel - b.definition.requiredLevel || (a.definition.displayOrder || 0) - (b.definition.displayOrder || 0));
+      const names = new Set();
+      feats.forEach(f => {
+        const df = f.definition; if (names.has(df.name)) return; names.add(df.name);
+        const subs = optionsFor(d.options?.class, df.id).map(o => ({ id: o.definition.id, name: o.definition.name, text: summary(o.definition, c.level), desc: cleanHtml(resolve(o.definition.description, c.level)) }));
+        const text = summary(df, c.level);
+        if (/^Core .* Traits$/.test(df.name) || (!text && !subs.length && /Subclass$/.test(df.name))) return;
+        classFeatures.push({ id: df.id, name: df.name, text, desc: cleanHtml(resolve(df.description, c.level)), subs, tag: classes.length > 1 ? c.definition.name + ' ' + df.requiredLevel : 'Lvl ' + df.requiredLevel });
+      });
+    });
+    if (known.size) {
+      const subs = [...known].map(([mname, ws]) => ({ name: `${mname} (${[...ws].filter(Boolean).join(', ')})`.replace(' ()', ''), text: masteryDesc[mname] || MASTERY[mname], desc: `<p>${esc(masteryDesc[mname] || MASTERY[mname])}</p>` }));
+      const wm = classFeatures.find(f => /Weapon Mastery/i.test(f.name));
+      if (wm) { wm.subs = [...(wm.subs || []), ...subs]; wm.text = 'You can use the mastery properties of these weapons:'; }
+      else classFeatures.push({ name: 'Weapon Mastery', text: 'You can use the mastery properties of these weapons:', desc: '', subs, tag: '' });
+    }
+    const speciesTraits = [];
+    (d.race?.racialTraits || []).filter(t => !t.definition.hideInSheet && !/^(Ability Score Increases?|Languages|Creature Type|Size|Speed)$/.test(t.definition.name)).forEach(t => {
+      const subs = optionsFor(d.options?.race, t.definition.id).filter(o => !/^Increase/.test(o.definition.name)).map(o => ({ id: o.definition.id, name: o.definition.name, text: summary(o.definition), desc: cleanHtml(o.definition.description) }));
+      speciesTraits.push({ id: t.definition.id, name: t.definition.name, text: summary(t.definition), desc: cleanHtml(resolve(t.definition.description)), subs });
+    });
+    const feats = [];
+    (d.feats || []).filter(f => !(f.definition.categories || []).some(c => /DISGUISE/.test(c.tagName))).forEach(f => {
+      const subs = optionsFor(d.options?.feat, f.definition.id).map(o => ({ id: o.definition.id, name: o.definition.name, text: summary(o.definition), desc: cleanHtml(o.definition.description) }));
+      feats.push({ id: f.definition.id, name: f.definition.name, text: summary(f.definition), desc: cleanHtml(resolve(f.definition.description)), subs });
+    });
+    const bg = d.background?.definition;
+    if (bg?.featureName) feats.push({ name: bg.featureName, text: (s => s.length > 220 ? s.slice(0, s.lastIndexOf(' ', 220)) + '…' : s)(htmlToText(bg.featureDescription)), desc: cleanHtml(bg.featureDescription), subs: [], tag: 'Background' });
+
+    // ---- equipment
+    const contName = {}; inv.forEach(i => { if (i.definition.isContainer) contName[i.id] = i.definition.name; });
+    const groups = { eq: [], carried: [] };
+    // limited-use actions (racial, class, feat): attach a use tracker to the feature they come from
+    const homes = { race: speciesTraits, class: classFeatures, feat: feats };
+    for (const [k, arr] of Object.entries(d.actions || {})) (arr || []).forEach(a => {
+      const n = usesOf(a.limitedUse); if (!(n > 0) || !homes[k]) return;
+      const uses = { n, reset: resetOf(a.limitedUse), used: a.limitedUse.numberUsed || 0 };
+      let target = null;
+      for (const list of Object.values(homes)) for (const f of list) {
+        if (f.id === a.componentId) target = target || f;
+        (f.subs || []).forEach(s => { if (s.id === a.componentId) target = target || s; });
+      }
+      if (target && !target.uses) target.uses = uses;
+      else if (!target) homes[k].push({ id: a.id, name: a.name, text: resolve(htmlToText(a.snippet || a.description)).slice(0, 200), desc: cleanHtml(a.description || ''), subs: [], uses });
+    });
+    const tally = (arr, i) => { const e = arr.find(x => x.n === i.definition.name && !x.u); const lu = i.limitedUse; const u = usesOf(lu) > 0 ? { n: usesOf(lu), reset: resetOf(lu) || '', used: lu.numberUsed || 0 } : null; if (e && !u) e.q += i.quantity || 1; else arr.push({ n: i.definition.name, q: i.quantity || 1, u }); };
+    inv.forEach(i => {
+      if (i.containerEntityId && contName[i.containerEntityId]) tally(groups['box' + i.containerEntityId] ||= [], i);
+      else tally(i.equipped ? groups.eq : groups.carried, i);
+    });
+    const fmtList = arr => arr.map(x => esc(x.n) + (x.q > 1 ? ' ×' + x.q : '') + (x.u ? ' ' + usesChip(x.u) : '')).join(', ');
+    let equipHtml = '';
+    if (groups.eq.length) equipHtml += `<p><strong>Equipped:</strong> ${fmtList(groups.eq)}</p>`;
+    if (groups.carried.length) equipHtml += `<p><strong>Carried:</strong> ${fmtList(groups.carried)}</p>`;
+    Object.keys(groups).filter(k => k.startsWith('box')).forEach(k => { equipHtml += `<p><strong>${esc(contName[k.slice(3)])}:</strong> ${fmtList(groups[k])}</p>`; });
+    const attune = inv.filter(i => i.isAttuned).map(i => i.definition.name);
+    while (attune.length < 3) attune.push('');
+
+    // ---- personality / appearance
+    const tr = d.traits || {}, nt = d.notes || {};
+    const block = (label, v) => v ? `<p><strong>${label}.</strong> ${esc(v).replace(/\n+/g, '<br>')}</p>` : '';
+    const backstory = [block('Personality', tr.personalityTraits), block('Ideals', tr.ideals), block('Bonds', tr.bonds), block('Flaws', tr.flaws), block('Faith', d.faith),
+      nt.backstory ? `<p>${esc(nt.backstory).replace(/\n+/g, '</p><p>')}</p>` : '', block('Allies', nt.allies), block('Organizations', nt.organizations), block('Enemies', nt.enemies), block('Notes', nt.otherNotes)].join('');
+    const look = [['Gender', d.gender], ['Age', d.age], ['Height', d.height], ['Weight', d.weight && (d.weight + ' lb')], ['Hair', d.hair], ['Eyes', d.eyes], ['Skin', d.skin]].filter(x => x[1]).map(x => `<strong>${x[0]}</strong> ${esc(x[1])}`).join(' · ');
+    const appearance = (look ? `<p>${look}</p>` : '') + (tr.appearance ? `<p>${esc(tr.appearance).replace(/\n+/g, '</p><p>')}</p>` : '');
+
+    const defenses = [];
+    find('resistance', null).forEach(m => defenses.push('Resist ' + m.friendlySubtypeName));
+    find('immunity', null).forEach(m => defenses.push('Immune ' + m.friendlySubtypeName));
+    find('vulnerability', null).forEach(m => defenses.push('Vulnerable ' + m.friendlySubtypeName));
+    find('advantage', 'saving-throws').forEach(m => m.restriction && defenses.push('Adv. on saves ' + m.restriction.replace(/^Made /, '').replace(/^to /, 'to ')));
+
+    return {
+      v: 1,
+      source: { id: d.id, url: d.readonlyUrl || `https://www.dndbeyond.com/characters/${d.id}`, importedAt: new Date().toISOString(), avatar: raw.__avatarData || d.decorations?.avatarUrl || '' },
+      avatar: raw.__avatarData || d.decorations?.avatarUrl || '',
+      showAvatar: !!(raw.__avatarData || d.decorations?.avatarUrl),
+      name: d.name || '',
+      player: d.username || '',
+      background: bg?.name || '',
+      className: classes.map(c => c.definition.name + (classes.length > 1 ? ' ' + c.level : '')).join(' / '),
+      subclass: classes.map(c => c.subclassDefinition?.name).filter(Boolean).join(' / '),
+      classList: classes.map(c => ({ name: c.definition.name, level: c.level, sub: c.subclassDefinition?.name || '' })),
+      species: d.race?.fullName || d.race?.baseRaceName || '',
+      level: totalLevel,
+      xp: d.preferences?.progressionType === 1 ? 'Milestone' : String(d.currentXp ?? ''),
+      ac, shield: !!shield, hp, hitDice, deathSaves: { s: d.deathSaves?.successCount || 0, f: d.deathSaves?.failCount || 0 },
+      profBonus: pb, abilities, skills, initBonus, speed, size, ppBonus, senses: senses.join(', '), defenses: defenses.join('\n'),
+      heroicInspiration: !!d.inspiration,
+      ...(() => {
+        // per class: max prepared (2024 'Prepared Spells' column) and cantrips known
+        const per = (key) => {
+          const parts = [];
+          classes.forEach(c => {
+            const r = c.definition.canCastSpells ? c.definition.spellRules : c.subclassDefinition?.canCastSpells ? c.subclassDefinition.spellRules : null;
+            const n = r ? (key === 'prep' ? (r.levelPreparedSpellMaxes?.[c.level] || r.levelSpellKnownMaxes?.[c.level] || 0) : (r.levelCantripsKnownMaxes?.[c.level] || 0)) : 0;
+            if (n) parts.push([c.definition.name, n]);
+          });
+          return parts.length > 1 ? parts.map(([nm, n]) => `${nm} ${n}`).join(' · ') : parts.length ? String(parts[0][1]) : '';
+        };
+        return { prepMax: per('prep'), cantripMax: per('cantrip') };
+      })(),
+      noSpells: !casters.length && !spells.length,
+      attacksPerAction, armorTraining, weaponProfs: weaponProfs.join(', ') + (weaponProfs.length ? ' weapons' : '').replace(/^(Simple|Martial) weapons$/, '$1 weapons'),
+      toolProfs: toolProfs.join(', '),
+      attacks, classFeatures, speciesTraits, feats,
+      spellAbility: spellAbility || 'int', spellcastingClass: casters.map(c => c.definition.name).join(' / '),
+      slots, spells,
+      appearance, backstory, alignment: ALIGN[d.alignmentId] || '', languages: langs.join(', '),
+      equipment: equipHtml, attunement: attune.slice(0, 3),
+      coins: { cp: d.currencies?.cp || 0, sp: d.currencies?.sp || 0, ep: d.currencies?.ep || 0, gp: d.currencies?.gp || 0, pp: d.currencies?.pp || 0 },
+      extraNotes: ''
+    };
+  }
+  return { parse, mod, sgn, cleanHtml, usesChip, SKILLS, AB };
+})();
+
+const SAMPLE = {"v":1,"sample":true,"source":{"id":"sample","url":"https://www.dndbeyond.com/characters/171358120","importedAt":"2026-10-25T21:19:06.090Z"},"name":"Sylren","player":"","background":"Acolyte","className":"Warlock","subclass":"","species":"Elf","level":1,"xp":"Milestone","ac":13,"shield":false,"hp":{"max":9,"current":9,"temp":0},"hitDice":{"max":"1d8","spent":0},"deathSaves":{"s":0,"f":0},"profBonus":2,
+"abilities":{"str":{"score":8,"save":false,"saveBonus":0},"dex":{"score":14,"save":false,"saveBonus":0},"con":{"score":13,"save":false,"saveBonus":0},"int":{"score":12,"save":false,"saveBonus":0},"wis":{"score":11,"save":true,"saveBonus":0},"cha":{"score":17,"save":true,"saveBonus":0}},
+"skills":{"acrobatics":{"prof":0,"bonus":0},"animal-handling":{"prof":0,"bonus":0},"arcana":{"prof":1,"bonus":0},"athletics":{"prof":0,"bonus":0},"deception":{"prof":1,"bonus":0},"history":{"prof":0,"bonus":0},"insight":{"prof":1,"bonus":0},"intimidation":{"prof":0,"bonus":0},"investigation":{"prof":0,"bonus":0},"medicine":{"prof":0,"bonus":0},"nature":{"prof":0,"bonus":0},"perception":{"prof":1,"bonus":0},"performance":{"prof":0,"bonus":0},"persuasion":{"prof":0,"bonus":0},"religion":{"prof":1,"bonus":0},"sleight-of-hand":{"prof":0,"bonus":0},"stealth":{"prof":0,"bonus":0},"survival":{"prof":0,"bonus":0}},
+"initBonus":0,"speed":"30 ft.","size":"Medium","ppBonus":0,"senses":"Darkvision 60 ft.","defenses":"Immune Magical Sleep\nAdv. on saves to avoid or end the Charmed condition","heroicInspiration":false,"armorTraining":{"light":true,"medium":false,"heavy":false,"shields":false},"weaponProfs":"Simple weapons","toolProfs":"",
+"attacks":[{"name":"Dagger (2)","sub":"Melee Weapon","range":"20 (60)","hit":"+4","damage":"1d4+2","dtype":"Piercing","notes":"Finesse, Light, Thrown"},{"name":"Sickle","sub":"Melee Weapon","range":"5 ft. Reach","hit":"+1","damage":"1d4-1","dtype":"Slashing","notes":"Light"},{"name":"Poison Spray","sub":"Cantrip • Warlock","range":"30 ft.","hit":"+5","damage":"1d12","dtype":"Poison","notes":"V/S"},{"name":"Eldritch Blast","sub":"Cantrip • Eldritch Invocations","range":"120 ft.","hit":"+5","damage":"1d10","dtype":"Force","notes":"V/S"},{"name":"Unarmed Strike","sub":"Melee Attack","range":"5 ft. Reach","hit":"+1","damage":"0","dtype":"Bludgeoning","notes":""}],"attacksPerAction":1,
+"classFeatures":[{"name":"Eldritch Invocations","text":"You have unearthed Eldritch Invocations, pieces of forbidden knowledge that imbue you with an abiding magical ability or other lessons. If an invocation has a prerequisite, you must meet it to learn that invocation.","desc":"","subs":[{"name":"Pact of the Tome","text":"At the end of a Short or Long Rest you can conjure forth a book in your hand, a Book of Shadows, which contains eldritch magic that only you can access. When the book appears, choose 3 cantrips and two level 1 Ritual spells from any class’s spell list. You can use the book as a Spellcasting Focus. The book disappears if you conjure another one or if you die.","desc":""}],"tag":"Lvl 1"},{"name":"Pact Magic","text":"Through occult ceremony, you have formed a pact with a mysterious entity to gain magical powers. Charisma is your spellcasting ability. You regain all expended Pact Magic slots when you finish a Short or Long Rest.","desc":"","subs":[],"tag":"Lvl 1"}],
+"speciesTraits":[{"name":"Darkvision","text":"You have Darkvision with a range of 60 ft.","desc":"","subs":[]},{"name":"Elven Lineage","text":"Choose a lineage from the Elven Lineages table. You gain the level 1 benefit of that lineage.","desc":"","subs":[{"name":"High Elf Lineage","text":"You gain the spells outlined in the Elven Lineages table, and whenever you finish a Long Rest, you can replace the cantrip at level 1 with a different cantrip from the Wizard spell list.","desc":""}]},{"name":"Fey Ancestry","text":"You have Advantage on saving throws you make to avoid or end the Charmed condition.","desc":"","subs":[]},{"name":"Keen Senses","text":"You have proficiency in the Insight, Perception, or Survival skill.","desc":"","subs":[]},{"name":"Trance","text":"You don’t need to sleep, and magic can’t put you to sleep. You can finish a Long Rest in 4 hours if you spend those hours in a trancelike meditation, during which you retain consciousness.","desc":"","subs":[]},{"name":"Elven Lineage Spells","text":"When you choose your Elven Lineage, and at character levels 3 and 5, you learn a spell as shown on the table. You always have that spell prepared.","desc":"","subs":[{"name":"High Elf - Charisma","text":"Your High Elf Lineage spells use Charisma.","desc":""}]}],
+"feats":[{"name":"Shelter of the Faithful","text":"As an acolyte, you command the respect of those who share your faith, and you can perform the religious ceremonies of your deity. You and your adventuring companions can expect to receive free healing and care at a temple, shrine, or other established presence of your faith.","desc":"","subs":[],"tag":"Background"}],
+"prepMax":"2","cantripMax":"2","spellAbility":"cha","spellcastingClass":"Warlock",
+"slots":{"1":{"total":1,"expended":0,"pact":true},"2":{"total":0,"expended":0,"pact":false},"3":{"total":0,"expended":0,"pact":false},"4":{"total":0,"expended":0,"pact":false},"5":{"total":0,"expended":0,"pact":false},"6":{"total":0,"expended":0,"pact":false},"7":{"total":0,"expended":0,"pact":false},"8":{"total":0,"expended":0,"pact":false},"9":{"total":0,"expended":0,"pact":false}},
+"spells":[{"level":0,"p":null,"name":"Eldritch Blast","time":"Action","range":"120 ft","c":false,"r":false,"m":false,"notes":"V, S · Inst. · Tome","material":"","desc":""},{"level":0,"p":null,"name":"Friends","time":"Action","range":"10 ft","c":true,"r":false,"m":false,"notes":"S, M · 1 min","material":"some makeup","desc":""},{"level":0,"p":null,"name":"Mage Hand","time":"Action","range":"30 ft","c":false,"r":false,"m":false,"notes":"V, S · 1 min · Tome","material":"","desc":""},{"level":0,"p":null,"name":"Message","time":"Action","range":"120 ft","c":false,"r":false,"m":false,"notes":"S, M · 1 rnd · High Elf","material":"a copper wire","desc":""},{"level":0,"p":null,"name":"Minor Illusion","time":"Action","range":"30 ft (5-ft Cube)","c":false,"r":false,"m":false,"notes":"S, M · 1 min · Tome","material":"a bit of fleece","desc":""},{"level":0,"p":null,"name":"Poison Spray","time":"Action","range":"30 ft","c":false,"r":false,"m":false,"notes":"V, S · Inst.","material":"","desc":""},{"level":1,"p":true,"name":"Armor of Agathys","time":"Bonus","range":"Self","c":false,"r":false,"m":false,"notes":"V, S, M · 1 hr","material":"a shard of blue glass","desc":""},{"level":1,"p":true,"ap":true,"name":"Comprehend Languages","time":"Action","range":"Self","c":false,"r":true,"m":false,"notes":"V, S, M · 1 hr · Tome","material":"a pinch of soot and salt","desc":""},{"level":1,"p":true,"ap":true,"name":"Detect Magic","time":"Action","range":"Self (30-ft Sphere)","c":true,"r":true,"m":false,"notes":"V, S · 10 min · Tome","material":"","desc":""},{"level":1,"p":true,"name":"Hex","time":"Bonus","range":"90 ft","c":true,"r":false,"m":false,"notes":"V, S, M · 1 hr","material":"the petrified eye of a newt","desc":""}],
+"appearance":"","backstory":"<p><strong>Personality.</strong> I see omens in every event and action. The gods try to speak to us, we just need to listen.<br>I’ve spent so long in the temple that I have little practical experience dealing with people in the outside world.</p><p><strong>Ideals.</strong> Change. We must help bring about the changes the gods are constantly working in the world. (Chaotic)</p><p><strong>Bonds.</strong> I seek to preserve a sacred text that my enemies consider heretical and seek to destroy.</p><p><strong>Flaws.</strong> Once I pick a goal, I become obsessed with it to the detriment of everything else in my life.</p>",
+"alignment":"Chaotic Good","languages":"Common, Elvish, Dwarvish",
+"equipment":"<p><strong>Equipped:</strong> Leather, Dagger ×2, Sickle</p><p><strong>Carried:</strong> Clothes, Common, Vestments, Backpack, Book, Amulet, Orb</p><p><strong>Backpack:</strong> Oil ×10, Parchment ×10, Tinderbox, Book, Lamp, Ink Pen, Ink</p>",
+"attunement":["","",""],"coins":{"cp":0,"sp":0,"ep":0,"gp":30,"pp":0},"extraNotes":""};
+
+/* ===== Ornamental SVG frames in the style of the 2024 sheet ===== */
+const SheetFrames = (() => {
+  const G = '#8d8c8a', GI = '#a3a29f', K = '#1c1c1c', W = '#ffffff';
+  const n = v => Math.round(v * 10) / 10;
+  // rectangle with concave (scooped) corners
+  const notch = (x, y, w, h, r) => `M${n(x + r)},${n(y)}H${n(x + w - r)}A${r},${r} 0 0 0 ${n(x + w)},${n(y + r)}V${n(y + h - r)}A${r},${r} 0 0 0 ${n(x + w - r)},${n(y + h)}H${n(x + r)}A${r},${r} 0 0 0 ${n(x)},${n(y + h - r)}V${n(y + r)}A${r},${r} 0 0 0 ${n(x + r)},${n(y)}Z`;
+  const P = (d, sw = 2.6, fill = 'none', stroke = G) => `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const ring = (cx, cy, r, sw = 1.6) => `<circle cx="${n(cx)}" cy="${n(cy)}" r="${r}" fill="${W}" stroke="${G}" stroke-width="${sw}"/>`;
+  const card = (w, h, inset = 1.5, r = 9) => P(notch(inset, inset, w - inset * 2, h - inset * 2, r), 2.6, W) + P(notch(inset + 4.2, inset + 4.2, w - inset * 2 - 8.4, h - inset * 2 - 8.4, Math.max(3, r - 3)), 0.8, 'none', GI);
+
+  let S = 1, BOX = null;
+  const rel = el => {
+    const b = BOX.getBoundingClientRect(), e = el.getBoundingClientRect();
+    return { x: (e.left - b.left) / S, y: (e.top - b.top) / S, w: e.width / S, h: e.height / S, get r() { return this.x + this.w; }, get b() { return this.y + this.h; }, get cx() { return this.x + this.w / 2; }, get cy() { return this.y + this.h / 2; } };
+  };
+  const q = s => BOX.querySelector(s);
+
+  // drape: a sweeping curtain line from (x0,y0) down to (x1,y1)
+  const drape = (x0, y0, x1, y1, bend = 0.15) => P(`M${n(x0)},${n(y0)}C${n(x0 + (x1 - x0) * bend)},${n(y0 + (y1 - y0) * 0.55)} ${n(x0 + (x1 - x0) * 0.55)},${n(y1 - (y1 - y0) * 0.12)} ${n(x1)},${n(y1)}`, 1.1, 'none', GI);
+
+  const B = {
+    panel(w, h) { return card(w, h); },
+
+    page(w, h) {
+      const i = 9;
+      return P(notch(i, i, w - 2 * i, h - 2 * i, 12), 1.4, 'none', G) + P(notch(i + 3.5, i + 3.5, w - 2 * i - 7, h - 2 * i - 7, 9), 0.7, 'none', GI) +
+        [[i, i], [w - i, i], [i, h - i], [w - i, h - i]].map(([x, y]) => ring(x, y, 4.2, 1.3)).join('');
+    },
+
+    ability(w, h) {
+      const t = rel(q('.ttl')), c = rel(q('.circ')), tb = rel(q('.tab')), sv = rel(q('.sk.save'));
+      const cx = c.cx, cy = c.cy, r = c.w / 2;
+      const capeB = sv.y - 2, saveB = sv.b + 2;
+      let s = '';
+      // side rails with scrolled tops
+      for (const side of [0, 1]) {
+        const X = v => side ? w - v : v;
+        s += P(`M${X(1.6)},${n(h - 12)}V24Q${X(1.6)},12 ${X(8)},10`, 2.2);
+        s += P(`M${X(4.4)},${n(h - 14)}V26`, 0.8, 'none', GI);
+        s += P(`M${X(1.6)},${n(h - 12)}Q${X(1.6)},${n(h - 2)} ${X(9)},${n(h - 1.6)}`, 2.2);
+      }
+      s += P(notch(7.5, 1.5, w - 15, h - 3, 9), 2.6, W) + P(notch(11.5, 5.5, w - 23, capeB - 6, 6), 0.8, 'none', GI);
+      // cape drapes
+      s += drape(12, t.b - 1, cx - r * 0.95, capeB - 2, 0.05) + drape(w - 12, t.b - 1, Math.min(w - 16, tb.r - 4), capeB - 2, 0.05);
+      // section rules
+      s += P(`M7.5,${n(capeB)}H${n(w - 7.5)}`, 2.4) + P(`M7.5,${n(saveB)}H${n(w - 7.5)}`, 2.4);
+      // score tab (folder shape)
+      const x0 = cx, x1 = tb.r, y0 = tb.y, y1 = tb.b;
+      s += P(`M${n(x0)},${n(y0 + 5)}H${n(x1 - 28)}L${n(x1 - 24)},${n(y0)}H${n(x1 - 9)}L${n(x1 - 1)},${n(y1)}H${n(x0)}Z`, 2.2, W);
+      s += P(`M${n(x0)},${n(y0 + 8.5)}H${n(x1 - 29.5)}L${n(x1 - 25.5)},${n(y0 + 3.6)}H${n(x1 - 11.5)}L${n(x1 - 5)},${n(y1 - 3.2)}H${n(x0)}`, 0.8, 'none', GI);
+      // modifier circle with inner drapes and notch
+      s += `<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r - 1.5)}" fill="${W}" stroke="${G}" stroke-width="3.2"/>`;
+      s += P(`M${n(cx - r * .8)},${n(cy - r * .42)}Q${n(cx - r * .74)},${n(cy + r * .5)} ${n(cx - r * .22)},${n(cy + r * .9)}`, 0.9, 'none', GI);
+      s += P(`M${n(cx + r * .8)},${n(cy - r * .42)}Q${n(cx + r * .74)},${n(cy + r * .5)} ${n(cx + r * .22)},${n(cy + r * .9)}`, 0.9, 'none', GI);
+      s += P(`M${n(cx - r * .2)},${n(cy + r - 1.5)}L${n(cx)},${n(cy + r * .66)}L${n(cx + r * .2)},${n(cy + r - 1.5)}`, 1.3, W);
+      s += ring(9.5, 4, 3.4, 1.4);
+      return s;
+    },
+
+    pb(w, h) {
+      const t = rel(q('.ttl')), f = rel(q('.fld'));
+      const pl = f.x - 4, pr = f.r + 4, top = t.b + 1, bot = f.b + 2, rr = 9;
+      let s = card(w, h) + ring(4, 4, 3.6, 1.4);
+      s += drape(9, top + 1, pl - 2, bot - 4, 0.05) + drape(w - 9, top + 1, pr + 2, bot - 4, 0.05);
+      s += P(`M${n(pl - 7)},${n(top)}V${n(bot - 6)}`, 0.8, 'none', GI) + P(`M${n(pr + 7)},${n(top)}V${n(bot - 6)}`, 0.8, 'none', GI);
+      s += P(`M${n(pl)},${n(top)}V${n(bot - rr)}A${rr},${rr} 0 0 1 ${n(pl + rr)},${n(bot)}H${n(pr - rr)}A${rr},${rr} 0 0 1 ${n(pr)},${n(bot - rr)}V${n(top)}`, 2.6, W);
+      s += P(`M${n(pl + 3.5)},${n(top)}V${n(bot - rr - 1)}A${rr - 3},${rr - 3} 0 0 1 ${n(pl + rr + 1)},${n(bot - 3.5)}H${n(pr - rr - 1)}A${rr - 3},${rr - 3} 0 0 1 ${n(pr - 3.5)},${n(bot - rr - 1)}V${n(top)}`, 0.8, 'none', GI);
+      return s;
+    },
+
+    stat(w, h) {
+      const t = rel(q('.ttl'));
+      let s = card(w, h);
+      s += drape(7, t.b + 1, w * 0.27, h - 6, 0.04) + drape(w - 7, t.b + 1, w * 0.73, h - 6, 0.04);
+      s += drape(14, t.b + 1, w * 0.33, h - 6, 0.0) + drape(w - 14, t.b + 1, w * 0.67, h - 6, 0.0);
+      return s;
+    },
+
+    heroic(w, h) {
+      const d = rel(q('.dia'));
+      const body = `M10.5,1.5H${n(w - 10.5)}A9,9 0 0 0 ${n(w - 1.5)},10.5V${n(h - 26)}Q${n(w - 1.5)},${n(h - 1.5)} ${n(w / 2)},${n(h - 1.5)}Q1.5,${n(h - 1.5)} 1.5,${n(h - 26)}V10.5A9,9 0 0 0 10.5,1.5Z`;
+      const inner = `M12,5.7H${n(w - 12)}A6,6 0 0 0 ${n(w - 5.7)},12V${n(h - 27)}Q${n(w - 5.7)},${n(h - 5.7)} ${n(w / 2)},${n(h - 5.7)}Q5.7,${n(h - 5.7)} 5.7,${n(h - 27)}V12A6,6 0 0 0 12,5.7Z`;
+      const cx = d.cx, cy = d.cy, r = 17;
+      return P(body, 2.6, W) + P(inner, 0.8, 'none', GI) + drape(10, 30, cx - r, h - 8, 0.05) + drape(w - 10, 30, cx + r, h - 8, 0.05) +
+        `<circle cx="${n(cx)}" cy="${n(cy)}" r="${r}" fill="${W}" stroke="${G}" stroke-width="2.8"/>` + ring(9.5, 4, 3.4, 1.4);
+    },
+
+    ac(w, h) {
+      const shield = (i, r) => `M${n(i)},${n(i + r)}A${r},${r} 0 0 0 ${n(i + r)},${n(i)}H${n(w - i - r)}A${r},${r} 0 0 0 ${n(w - i)},${n(i + r)}V${n(h * 0.56)}C${n(w - i)},${n(h * 0.8)} ${n(w * 0.68)},${n(h * 0.9 - i * 0.4)} ${n(w / 2)},${n(h - i)}C${n(w * 0.32)},${n(h * 0.9 - i * 0.4)} ${n(i)},${n(h * 0.8)} ${n(i)},${n(h * 0.56)}Z`;
+      return P(shield(1.5, 8), 2.6, W) + P(shield(5.6, 5), 0.8, 'none', GI);
+    },
+
+    lvl(w, h) {
+      const cx = w / 2, cy = h / 2;
+      return `<ellipse cx="${n(cx)}" cy="${n(cy)}" rx="${n(cx - 1.5)}" ry="${n(cy - 1.5)}" fill="${W}" stroke="${G}" stroke-width="2.6"/>` +
+        `<ellipse cx="${n(cx)}" cy="${n(cy)}" rx="${n(cx - 5.6)}" ry="${n(cy - 5.6)}" fill="none" stroke="${GI}" stroke-width="0.8"/>` +
+        drape(9, cy - 18, cx - 14, h - 12, 0.1) + drape(w - 9, cy - 18, cx + 14, h - 12, 0.1);
+    },
+
+    portrait(w, h) {
+      // arched top, scooped bottom corners
+      const arch = (i, r) => { const rx = (w - 2 * i) / 2, ry = Math.min(rx * 0.85, (h - 2 * i) * 0.45);
+        return `M${n(i)},${n(i + ry)}A${n(rx)},${n(ry)} 0 0 1 ${n(w - i)},${n(i + ry)}V${n(h - i - r)}A${r},${r} 0 0 0 ${n(w - i - r)},${n(h - i)}H${n(i + r)}A${r},${r} 0 0 0 ${n(i)},${n(h - i - r)}Z`; };
+      return P(arch(1.5, 8), 2.6, 'none') + P(arch(5.6, 5), 0.8, 'none', GI) + ring(w / 2, 3.5, 3.4, 1.4);
+    },
+
+    vit(w, h) {
+      let s = card(w, h);
+      [...BOX.children].filter(c => c.tagName === 'DIV').slice(1).forEach(c => { const x = rel(c).x; s += P(`M${n(x)},5V${n(h - 5)}`, 2.2); });
+      return s;
+    },
+
+    band(w, h) {
+      const sp = rel(q('span'));
+      const y = h / 2, a = 14, l = sp.x - 12, r = sp.r + 12;
+      const rail = (x0, x1) => P(`M${n(x0)},${n(y - 4)}H${n(x1)}`, 2.2) + P(`M${n(x0)},${n(y + 4)}H${n(x1)}`, 1.1, 'none', GI) + P(`M${n(x0 + 30)},${n(y - 4)}Q${n((x0 + x1) / 2)},${n(y + 5)} ${n(x1 - 30)},${n(y - 4)}`, 0.8, 'none', GI);
+      return P(`M${a},2A11,${n(y - 2)} 0 0 0 ${a},${n(h - 2)}`, 2.2, W) + P(`M${a},2V${n(h - 2)}`, 2.2) + rail(a, l) +
+        P(`M${n(w - a)},2A11,${n(y - 2)} 0 0 1 ${n(w - a)},${n(h - 2)}`, 2.2, W) + P(`M${n(w - a)},2V${n(h - 2)}`, 2.2) + rail(r, w - a) +
+        P(`M${n(l)},${n(y - 4)}L${n(l + 6)},${n(y)}L${n(l)},${n(y + 4)}`, 1.4) + P(`M${n(r)},${n(y - 4)}L${n(r - 6)},${n(y)}L${n(r)},${n(y + 4)}`, 1.4);
+    },
+
+    coins(w, h) {
+      let s = card(w, h);
+      BOX.querySelectorAll('.c .fld').forEach(el => {
+        const f = rel(el), x = f.x, y = f.y, cw = f.w, ch = f.h, m = f.cx;
+        s += P(`M${n(x)},${n(y)}H${n(x + cw)}V${n(ch + y - 5)}H${n(m + 4)}L${n(m)},${n(y + ch + 1)}L${n(m - 4)},${n(y + ch - 5)}H${n(x)}Z`, 1.5, W);
+        s += P(`M${n(x)},${n(y + 3)}H${n(x + cw)}`, 2.2, 'none', K);
+      });
+      return s;
+    }
+  };
+
+  const MAP = [
+    ['.page:not(.flow)', 'page'], ['.abl', 'ability'], ['.pb', 'pb'], ['.stat', 'stat'], ['.heroic', 'heroic'],
+    ['.ac', 'ac'], ['.lvl', 'lvl'], ['.portrait', 'portrait'], ['.vit', 'vit'], ['.divider', 'band'], ['.coins', 'coins'],
+    ['.ident, .weapons, .features, .pair > .box, .training, .spellsbox, .slots, .scbox, .appear, .backstory, .langs, .equip', 'panel']
+  ];
+
+  function decorate(root = document) {
+    root.querySelectorAll('.page').forEach(pg => {
+      const pr = pg.getBoundingClientRect(); if (!pr.width) return;
+      S = pr.width / 816;
+      for (const [sel, type] of MAP) {
+        const els = pg.matches(sel) ? [pg] : [...pg.querySelectorAll(sel)];
+        els.forEach(el => {
+          BOX = el;
+          const r = el.getBoundingClientRect(); const w = r.width / S, h = r.height / S;
+          if (!w || !h) return;
+          let svg;
+          try { svg = B[type](w, h); } catch (e) { console.warn('frame', type, e); return; }
+          el.querySelector(':scope > svg.frame')?.remove();
+          el.insertAdjacentHTML('afterbegin', `<svg class="frame" viewBox="0 0 ${n(w)} ${n(h)}" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>`);
+          el.classList.add('framed', 'fr-' + type);
+        });
+      }
+    });
+  }
+  return { decorate };
+})();
+
+/* ===== Character Sheet app ===== */
+(() => {
+  const P = DDBParse;
+  const AB = P.AB, SK = P.SKILLS;
+  const AB_LABEL = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+  const SK_LABEL = { acrobatics: 'Acrobatics', 'animal-handling': 'Animal Handling', arcana: 'Arcana', athletics: 'Athletics', deception: 'Deception', history: 'History', insight: 'Insight', intimidation: 'Intimidation', investigation: 'Investigation', medicine: 'Medicine', nature: 'Nature', perception: 'Perception', performance: 'Performance', persuasion: 'Persuasion', religion: 'Religion', 'sleight-of-hand': 'Sleight of Hand', stealth: 'Stealth', survival: 'Survival' };
+  const TEMPLATE_SLOTS = { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 };
+  const SPELL_ROWS = 30, SPELL_ROWS_CONT = 36, ATTACK_ROWS = 6;
+  const framed = (() => { try { return window.self !== window.top; } catch { return true; } })();
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sgn = n => (n >= 0 ? '+' : '') + n;
+  const num = v => { const n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); return isNaN(n) ? 0 : n; };
+  const mod = s => Math.floor((num(s) - 10) / 2);
+  const get = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
+  const set = (o, p, v) => {
+    const ks = p.split('.'); let a = o;
+    ks.slice(0, -1).forEach((k, i) => { if (a[k] == null) a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; });
+    a[ks[ks.length - 1]] = v;
+  };
+
+  // ---------- storage ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+  };
+  let lib = store.get('cs.library', {});
+  let curId = store.get('cs.current', null);
+  let prefs = Object.assign({ ref: true }, store.get('cs.prefs', {}));
+  let M = null;
+  let saveT = null;
+  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { if (!M || M.sample) return; lib[curId] = M; if (!store.set('cs.library', lib)) status('Could not save in this browser. Use Export to keep a copy.', true); }, 250); };
+
+  // ---------- sanitize (for pasted/imported html) ----------
+  function sanitize(html) {
+    const doc = new DOMParser().parseFromString('<div>' + (html || '') + '</div>', 'text/html');
+    const ok = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'H3', 'H4', 'DIV', 'SPAN']);
+    const walk = el => [...el.children].forEach(c => {
+      walk(c);
+      if (/^(SCRIPT|STYLE|IFRAME|OBJECT|TEMPLATE)$/.test(c.tagName)) { c.remove(); return; }
+      if (!ok.has(c.tagName)) { c.replaceWith(...c.childNodes); return; }
+      const isChip = c.tagName === 'SPAN' && c.classList.contains('uses');
+      [...c.attributes].forEach(a => { if (!(a.name === 'class' && /^(meta|uses)$/.test(a.value)) && !(isChip && /^data-(n|used|reset)$/.test(a.name))) c.removeAttribute(a.name); });
+      if (isChip) { c.textContent = ''; c.setAttribute('contenteditable', 'false'); }
+    });
+    const root = doc.body.firstChild; walk(root); return root.innerHTML;
+  }
+
+  // ---------- model prep ----------
+  const chip = u => u && u.n > 0 ? ' ' + P.usesChip(u) : '';
+  const featHtml = list => (list || []).map(f => `<p><strong>${esc(f.name)}.</strong>${chip(f.uses)} ${esc(f.text)}</p>` + (f.subs || []).map(s => `<p>• <strong><em>${esc(s.name)}.</em></strong>${chip(s.uses)} ${esc(s.text)}</p>`).join('')).join('');
+  // draw the stars inside every use-tracker chip from its data attributes
+  function paintChips(root) {
+    root.querySelectorAll('span.uses').forEach(c => {
+      const n = Math.max(0, parseInt(c.dataset.n, 10) || 0), used = Math.min(n, parseInt(c.dataset.used, 10) || 0), r = c.dataset.reset || '';
+      c.setAttribute('contenteditable', 'false'); c.classList.add('trk');
+      c.classList.toggle('pool', n > 8);
+      c.innerHTML = n > 8
+        ? `<u class="pool-line"></u><em>/ ${n}${r ? ' ' + esc(r) : ''}</em>`
+        : Array.from({ length: n }, (_, i) => `<i class="${i < used ? 'on' : ''}" data-ui="${i}"></i>`).join('') + (r ? `<em>${esc(r)}</em>` : '');
+    });
+  }
+  // typing [[3/LR]] (or [[2]]) in a text box turns into a tracker
+  const CHIP_RE = /\[\[\s*(\d{1,2})\s*(?:\/\s*([A-Za-z ]{1,12}?))?\s*\]\]/g;
+  function convertChipShorthand(el) {
+    if (!CHIP_RE.test(el.innerHTML)) return false;
+    el.innerHTML = el.innerHTML.replace(CHIP_RE, (_, n, r) => P.usesChip({ n: +n, used: 0, reset: (r || '').trim() }));
+    paintChips(el); return true;
+  }
+  function refHtml(m) {
+    const sect = (title, list) => !list?.length ? '' : `<h3>${title}</h3>` + list.map(f => `<h4>${esc(f.name)}${f.tag ? ` <em class="meta">· ${esc(f.tag)}</em>` : ''}</h4>${f.desc || `<p>${esc(f.text)}</p>`}` + (f.subs || []).map(s => `<h4>• ${esc(s.name)}</h4>${s.desc || `<p>${esc(s.text)}</p>`}`).join('')).join('');
+    return sect('Class Features', m.classFeatures) + sect('Species Traits', m.speciesTraits) + sect('Feats & Background', m.feats);
+  }
+  function spellRefHtml(m) {
+    const sp = (m.spells || []).filter(s => s && s.name && (s.desc || s.material));
+    if (!sp.length) return '';
+    return sp.map(s => `<h4>${esc(s.name)}</h4><p class="meta"><em>${s.level ? 'Level ' + s.level : 'Cantrip'} · ${esc(s.time)} · ${esc(s.range)}${s.c ? ' · Concentration' : ''}${s.r ? ' · Ritual' : ''}${s.material ? ' · M: ' + esc(s.material) : ''}</em></p>${s.desc || ''}`).join('');
+  }
+  function prepare(m) {
+    if (m.classFeaturesHtml == null) m.classFeaturesHtml = featHtml(m.classFeatures);
+    if (m.speciesHtml == null) m.speciesHtml = featHtml(m.speciesTraits);
+    if (m.featsHtml == null) m.featsHtml = featHtml(m.feats);
+    if (m.weaponsHtml == null) m.weaponsHtml = esc(m.weaponProfs || '');
+    if (m.toolsHtml == null) m.toolsHtml = esc(m.toolProfs || '');
+    if (m.languagesHtml == null) m.languagesHtml = esc(m.languages || '');
+    if (m.refHtml == null) m.refHtml = refHtml(m);
+    if (m.spellRefHtml == null) m.spellRefHtml = spellRefHtml(m);
+    m.attacks ||= []; m.spells ||= []; m.slots ||= {};
+    // older sheets: split "1d4+2 Piercing" into dice + type and lift range out of the notes
+    m.attacks.forEach(x => {
+      if (!x || !x.name || 'dtype' in x) return;
+      const dm = String(x.damage || '').match(/^(.*?)\s+([A-Za-z]+)$/); if (dm) { x.damage = dm[1]; x.dtype = dm[2]; } else x.dtype = '';
+      let n = String(x.notes || '');
+      const thr = n.match(/,?\s*(?:Range\s*)?(\d+)\/(\d+)( ft)?/); if (thr) { x.range = `${thr[1]} (${thr[2]})`; n = n.replace(thr[0], ''); }
+      const ct = n.match(/^Cantrip,?\s*([^,]*ft)?,?\s*/); if (ct) { x.sub = 'Cantrip'; if (ct[1]) x.range = ct[1].replace(/ ft$/, ' ft.'); n = n.replace(ct[0], ''); }
+      if (!x.range && !ct) x.range = /Unarmed/.test(x.name) ? '5 ft. Reach' : '';
+      x.sub ||= ''; x.notes = n.replace(/^,\s*/, '').trim();
+    });
+    if (m.attacksPerAction == null) m.attacksPerAction = 1;
+    if (m.avatar == null) m.avatar = m.source?.avatar || '';
+    if (m.showAvatar == null) m.showAvatar = !!m.avatar;
+    // older sheets listed only prepared spells: mark them prepared
+    m.spells.forEach(s => { if (s && s.name && !('p' in s)) s.p = String(s.level).trim() === '0' ? null : true; });
+    if (m.prepMax == null) m.prepMax = '';
+    if (m.cantripMax == null) m.cantripMax = '';
+    for (let i = 1; i <= 9; i++) m.slots[i] ||= { total: 0, expended: 0 };
+    m.coins ||= {}; m.attunement ||= ['', '', ''];
+    // zeros on tracking fields read as blanks on paper
+    const z = (o, k) => { if (o && (o[k] === 0 || o[k] === '0')) o[k] = ''; };
+    z(m.hp, 'temp'); z(m.hitDice, 'spent'); ['cp', 'sp', 'ep', 'gp', 'pp'].forEach(c => z(m.coins, c));
+    for (let i = 1; i <= 9; i++) z(m.slots[i], 'total');
+    return m;
+  }
+  function sanitizeModel(m) {
+    ['classFeaturesHtml', 'speciesHtml', 'featsHtml', 'weaponsHtml', 'toolsHtml', 'languagesHtml', 'refHtml', 'spellRefHtml', 'equipment', 'backstory', 'appearance', 'extraNotes'].forEach(k => { if (typeof m[k] === 'string') m[k] = sanitize(m[k]); });
+    return m;
+  }
+  const blank = () => prepare({ v: 1, source: {}, name: '', background: '', className: '', subclass: '', species: '', level: 1, xp: '', ac: 10, shield: false, hp: { max: '', current: '', temp: '' }, hitDice: { max: '', spent: '' }, deathSaves: { s: 0, f: 0 }, profBonus: 2,
+    abilities: Object.fromEntries(AB.map(a => [a, { score: 10, save: false, saveBonus: 0 }])), skills: Object.fromEntries(Object.keys(SK).map(k => [k, { prof: 0, bonus: 0 }])),
+    initBonus: 0, speed: '30 ft.', size: 'Medium', ppBonus: 0, senses: '', defenses: '', heroicInspiration: false, armorTraining: {}, spellAbility: 'int', classFeatures: [], speciesTraits: [], feats: [], appearance: '', backstory: '', alignment: '', equipment: '' });
+
+  // ---------- field builders ----------
+  const id = p => 'f-' + p.replace(/\./g, '-');
+  const f = (p, cls = '', ph = '') => `<input class="fld ${cls}" id="${id(p)}" data-k="${p}" value="${esc(get(M, p))}" ${ph ? `placeholder="${esc(ph)}"` : ''} autocomplete="off" spellcheck="false">`;
+  // wrapping single-value field: wraps onto extra lines instead of shrinking to a tiny size
+  const t = (p, cls = '', ph = '') => `<textarea class="fld wrap ${cls}" rows="1" id="${id(p)}" data-k="${p}" ${ph ? `placeholder="${esc(ph)}"` : ''} autocomplete="off" spellcheck="false">${esc(get(M, p))}</textarea>`;
+  const rich = (p, cls = '', ph = '') => `<div class="rich fit ${cls}" id="${id(p)}" data-k="${p}" data-rich contenteditable="true" data-ph="${esc(ph)}" spellcheck="true">${get(M, p) || ''}</div>`;
+  const dia = (p, title) => `<input type="checkbox" class="dia" id="${id(p)}" data-k="${p}" data-bool ${get(M, p) ? 'checked' : ''} aria-label="${esc(title)}">`;
+  const calc = (key, extra = '') => `<span data-calc="${key}" ${extra}></span>`;
+
+  // ---------- page 1 ----------
+  function ability(a, skills) {
+    return `<section class="box abl"><div class="ttl">${AB_LABEL[a]}</div>
+      <div class="amod"><div class="circ"><b data-calc="mod.${a}"></b><i>Modifier</i></div><div class="tab">${f('abilities.' + a + '.score', 'c')}<span class="cap">Score</span></div></div>
+      <div class="sk save"><button class="dot" data-save="${a}" aria-label="${AB_LABEL[a]} save proficiency"></button><span class="v" data-calc="save.${a}"></span>Saving Throw</div>
+      ${skills.map(s => `<div class="sk"><button class="dot" data-skill="${s}" aria-label="${SK_LABEL[s]} proficiency"></button><span class="v" data-calc="skill.${s}"></span>${SK_LABEL[s]}</div>`).join('')}
+    </section>`;
+  }
+  const skillsOf = a => Object.keys(SK).filter(s => SK[s] === a);
+
+  function page1() {
+    const atk = M.attacks;
+    const rows = Math.max(ATTACK_ROWS, atk.filter(x => x && x.name).length + 1);
+    const rh = Math.max(20, Math.min(28, Math.floor(168 / rows)));
+    let atkRows = '';
+    for (let i = 0; i < rows; i++) {
+      const p = `attacks.${i}`;
+      atkRows += `<tr><td class="n"><div class="stack">${t(p + '.name', 'aname', ' ')}${f(p + '.sub', 'asub', '')}</div></td>
+        <td>${t(p + '.range', 'arange')}</td>
+        <td class="hitc"><div class="hbox">${t(p + '.hit', 'c ahit')}</div></td>
+        <td><div class="stack">${f(p + '.damage', 'adice')}${f(p + '.dtype', 'asub')}</div></td>
+        <td>${t(p + '.notes', 'anotes')}</td></tr>`;
+    }
+    return `<div class="page" id="pg1"><div class="p1">
+      <div class="hdr${M.showAvatar ? ' with-portrait' : ''}">
+        ${M.showAvatar ? `<div class="portrait" id="portrait" title="Click to choose a picture">${M.avatar ? `<img src="${esc(M.avatar)}" alt="" draggable="false" style="object-position:${num(M.avatarX ?? 50)}% ${num(M.avatarY ?? 25)}%">` : '<span class="ph">Add a<br>portrait</span>'}</div>` : ''}
+        <section class="box ident">
+          <label class="lbl"><span class="cap">Character Name</span>${t('name', 'namefld nob')}</label>
+          <div class="row"><label class="lbl"><span class="cap">Background</span>${t('background')}</label><label class="lbl"><span class="cap">Class</span>${t('className')}</label></div>
+          <div class="row"><label class="lbl"><span class="cap">Species</span>${t('species')}</label><label class="lbl"><span class="cap">Subclass</span>${t('subclass')}</label></div>
+        </section>
+        <div class="lvl">${f('level')}<span class="cap">Level</span>${f('xp', 'xp c' + (/^\d[\d,]*$/.test(String(M.xp).trim()) ? ' trk' : ''), 'XP')}<span class="cap">XP</span></div>
+        <div class="ac"><span class="cap">Armor<br>Class</span>${f('ac', 'big')}<label>Shield ${dia('shield', 'Shield equipped')}</label></div>
+        <section class="box vit plain">
+          <div class="vcol"><div class="ttl">Hit Points</div><div class="vgrid hpg">
+            <label class="cell cur">${f('hp.current', 'trk')}<span class="cap">Current</span></label>
+            <label class="cell">${f('hp.temp', 'trk')}<span class="cap">Temp</span></label>
+            <label class="cell">${f('hp.max')}<span class="cap">Max</span></label></div></div>
+          <div class="vcol"><div class="ttl">Hit Dice</div><div class="vgrid">
+            <label class="cell">${f('hitDice.spent', 'trk')}<span class="cap">Spent</span></label>
+            <label class="cell">${f('hitDice.max')}<span class="cap">Max</span></label></div></div>
+          <div class="vcol ds"><div class="ttl">Death Saves</div><div class="vgrid">
+            <div class="cell"><div class="row trk" data-ds="s">${[1, 2, 3].map(i => `<button class="dia" data-dsi="${i}" aria-label="Success ${i}"></button>`).join('')}</div><span class="cap">Successes</span></div>
+            <div class="cell"><div class="row trk" data-ds="f">${[1, 2, 3].map(i => `<button class="dia" data-dsi="${i}" aria-label="Failure ${i}"></button>`).join('')}</div><span class="cap">Failures</span></div></div></div>
+        </section>
+      </div>
+      <div class="divider"><span>${esc(M.name) || 'Adventurer'}</span></div>
+      <div class="colA">
+        <section class="box pb"><div class="ttl">Proficiency Bonus</div>${f('profBonus', 'big')}</section>
+        ${ability('str', skillsOf('str'))}${ability('dex', skillsOf('dex'))}${ability('con', [])}
+        <section class="box heroic"><div class="ttl">Heroic<br>Inspiration</div>${dia('heroicInspiration', 'Heroic Inspiration').replace('class="dia"', 'class="dia trk"')}</section>
+      </div>
+      <div class="colB">${ability('int', skillsOf('int'))}${ability('wis', skillsOf('wis'))}${ability('cha', skillsOf('cha'))}</div>
+      <div class="colC">
+        <div class="stats">
+          <section class="box stat"><div class="ttl">Initiative</div><div class="val" data-calc="init"></div></section>
+          <section class="box stat"><div class="ttl">Speed</div>${t('speed', 'c')}</section>
+          <section class="box stat"><div class="ttl">Size</div>${t('size', 'c')}</section>
+          <section class="box stat"><div class="ttl">Passive Perception</div><div class="val" data-calc="pp"></div></section>
+        </div>
+        <div class="strip"><label><span class="cap">Senses</span>${t('senses')}</label><label style="flex:1.6"><span class="cap">Defenses</span>${t('defenses')}</label></div>
+        <section class="box weapons" style="--rh:${rh}px"><div class="ttl">Weapons &amp; Damage Cantrips</div>
+                    <table class="tbl atk"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col></colgroup>
+          <thead><tr><th>Attack</th><th>Range</th><th class="c">Hit / DC</th><th>Damage</th><th class="nth"><div class="thf"><span>Notes</span><label class="apa"><span class="cap">Attacks / Action</span>${f('attacksPerAction', 'c')}</label></div></th></tr></thead><tbody>${atkRows}</tbody></table></section>
+        <section class="box features"><div class="ttl">Class Features</div>${rich('classFeaturesHtml', 'gridbg', 'Class features…')}</section>
+        <div class="pair">
+          <section class="box"><div class="ttl">Species Traits</div>${rich('speciesHtml', 'gridbg', 'Species traits…')}</section>
+          <section class="box"><div class="ttl">Feats</div>${rich('featsHtml', 'gridbg', 'Feats…')}</section>
+        </div>
+      </div>
+      <section class="box training"><div class="ttl">Equipment Training &amp; Proficiencies</div>
+        <div class="armor"><span class="cap">Armor<br>Training</span>${['light', 'medium', 'heavy', 'shields'].map(k => `<label>${dia('armorTraining.' + k, k)}${k[0].toUpperCase() + k.slice(1)}</label>`).join('')}</div>
+        <div class="sec"><span class="cap">Weapons</span>${rich('weaponsHtml')}</div>
+        <div class="sec"><span class="cap">Tools</span>${rich('toolsHtml')}</div>
+      </section>
+    </div></div>`;
+  }
+
+  // shared page-2 boxes (also used by the no-spellcasting layout)
+  const box_appear = () => `<section class="box appear"><div class="ttl">Appearance</div>${rich('appearance', 'fill gridbg', 'Looks, clothing, mannerisms…')}</section>`;
+  const box_back = () => `<section class="box backstory"><div class="ttl">Backstory &amp; Personality</div>${rich('backstory', 'fill gridbg')}
+          <label class="align"><span class="cap">Alignment</span>${t('alignment')}</label></section>`;
+  const box_langs = () => `<section class="box langs"><div class="ttl">Languages</div>${rich('languagesHtml', 'fill')}</section>`;
+  const box_equip = () => `<section class="box equip"><div class="ttl">Equipment</div>${rich('equipment', 'fill gridbg')}
+          <div class="att"><span class="cap">Magic Item Attunement</span>${[0, 1, 2].map(i => `<div class="row"><span class="dia ${M.attunement[i] ? 'on' : ''}" data-attn="${i}"></span>${t('attunement.' + i)}</div>`).join('')}</div></section>`;
+  const box_coins = () => `<section class="box coins"><div class="ttl">Coins</div><div class="cg">${['cp', 'sp', 'ep', 'gp', 'pp'].map(c => `<label class="c"><span class="cap">${c.toUpperCase()}</span>${f('coins.' + c, 'trk')}</label>`).join('')}</div></section>`;
+  // ---------- page 2 ----------
+  function spellRow(i) {
+    const p = `spells.${i}`;
+    const s = M.spells[i] || {};
+    const prep = s.name && String(s.level).trim() === '0' ? '<span class="cantrip" title="Cantrips are always ready">—</span>'
+      : s.ap ? '<span class="cantrip" title="Always prepared: doesn\u2019t count toward your prepared maximum">—</span>'
+      : dia(p + '.p', 'Prepared').replace('class="dia"', 'class="dia trk"');
+    return `<tr><td class="pc">${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
+      <td><div class="crm">${['c', 'r', 'm'].map(k => `<label>${dia(p + '.' + k, k.toUpperCase())}${k.toUpperCase()}</label>`).join('')}</div></td><td>${t(p + '.notes')}</td></tr>`;
+  }
+  const spellTable = (from, to) => {
+    let rows = ''; for (let i = from; i < to; i++) rows += spellRow(i);
+    return `<table class="tbl spl"><colgroup><col class="pc"><col class="lv"><col><col class="ct"><col class="rg"><col class="cc"><col class="nt"></colgroup>
+      <thead><tr><th class="c" title="Prepared">Prep</th><th>Level</th><th>Name</th><th>Casting Time</th><th>Range</th><th>Concentration, Ritual &amp; Required Material</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+  };
+  function page2() {
+    const slotCell = l => {
+      const n = Math.max(TEMPLATE_SLOTS[l], num(M.slots[l].total));
+      return `<div class="sl"><span class="cap">Level ${l}${M.slots[l].pact ? '<span class="pact">PACT</span>' : ''}</span>${f(`slots.${l}.total`, 'c')}<span class="ds trk" data-slot="${l}">${Array.from({ length: n }, (_, i) => `<button class="dia" data-si="${i}" aria-label="Level ${l} slot ${i + 1}"></button>`).join('')}</span></div>`;
+    };
+    return `<div class="page" id="pg2"><div class="p2">
+      <div class="left">
+        <div class="sctop">
+          <section class="box scbox plain">
+            <label class="abil"><span class="cap">Spellcasting Ability</span><select id="f-spellAbility" data-k="spellAbility">${AB.map(a => `<option value="${a}" ${M.spellAbility === a ? 'selected' : ''}>${AB_LABEL[a]}</option>`).join('')}</select></label>
+            <div class="r"><b data-calc="sc.mod"></b><span>Spellcasting<br>Modifier</span></div>
+            <div class="r"><b data-calc="sc.dc"></b><span>Spell Save DC</span></div>
+            <div class="r"><b data-calc="sc.atk"></b><span>Spell Attack<br>Bonus</span></div>
+          </section>
+          <section class="box slots"><div class="ttl">Spell Slots</div>
+            <div class="grid">${[1, 4, 7, 2, 5, 8, 3, 6, 9].map(slotCell).join('')}</div>
+          </section>
+        </div>
+        <section class="box spellsbox" style="--rh:26px"><div class="ttl">Cantrips &amp; Spells</div>
+          <label class="splim l"><span class="cap">Cantrips<br>Known</span>${t('cantripMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.cantripMax || '').length * 5 + 14))}px"`)}</label>
+          <label class="splim r"><span class="cap">Max<br>Prepared</span>${t('prepMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.prepMax || '').length * 5 + 14))}px"`)}</label>${spellTable(0, SPELL_ROWS)}</section>
+      </div>
+      <div class="right">
+        ${box_appear()}
+        ${box_back()}
+        ${box_langs()}
+        ${box_equip()}
+        ${box_coins()}
+      </div>
+    </div>${M.source?.id && M.source.id !== 'sample' ? `<div class="foot">Imported from D&amp;D Beyond · ${new Date(M.source.importedAt).toLocaleDateString()}</div>` : ''}</div>`;
+  }
+  // no spellcasting: page 2 keeps the personal boxes up top and starts Features & Traits underneath
+  function page2lite() {
+    const feats = prefs.ref && M.refHtml ? `<h2>Features &amp; Traits <small>${esc(M.name)} · full text</small></h2>${rich('refHtml')}` : '';
+    return `<div class="page flow ref p2lite" id="pg2"><div class="p2l">
+      <div class="p2l-col">${box_back()}</div>
+      <div class="p2l-col">${box_equip()}</div>
+      <div class="p2l-col">${box_appear()}${box_langs()}${box_coins()}</div>
+    </div>${feats}</div>`;
+  }
+  function spellCont() {
+    const used = M.spells.reduce((n, s, i) => (s && s.name ? i + 1 : n), 0);
+    if (used < SPELL_ROWS - 1) return '';
+    let out = '', from = SPELL_ROWS, k = 1;
+    while (from <= used) {
+      const to = from + SPELL_ROWS_CONT;
+      out += `<div class="page"><section class="box spellsbox" style="--rh:25px;height:100%"><div class="ttl">Cantrips &amp; Spells (continued${k > 1 ? ' ' + k : ''})</div>${spellTable(from, to)}</section></div>`;
+      from = to; k++;
+    }
+    return out;
+  }
+  function refPages() {
+    if (!prefs.ref) return '';
+    let out = '';
+    if (M.refHtml && !M.noSpells) out += `<div class="page flow ref"><h2>Features &amp; Traits <small>${esc(M.name)} · full text</small></h2>${rich('refHtml')}</div>`;
+    if (M.spellRefHtml && !M.noSpells) out += `<div class="page flow ref"><h2>Spell Reference <small>${esc(M.name)}</small></h2>${rich('spellRefHtml')}</div>`;
+    out += `<div class="page flow ref noprint-empty"><h2>Notes <small>${esc(M.name)}</small></h2>${rich('extraNotes', '', 'Session notes, NPCs, loot… Prints as a lined page for writing by hand.')}</div>`;
+    return out;
+  }
+
+  // ---------- computed values ----------
+  function refresh() {
+    if (!M) return;
+    const pb = num(M.profBonus);
+    const md = a => mod(M.abilities[a]?.score);
+    const out = {};
+    AB.forEach(a => { out['mod.' + a] = sgn(md(a)); out['save.' + a] = sgn(md(a) + (M.abilities[a].save ? pb : 0) + num(M.abilities[a].saveBonus)); });
+    Object.keys(SK).forEach(s => { const k = M.skills[s] || { prof: 0 }; out['skill.' + s] = sgn(md(SK[s]) + Math.floor((+k.prof || 0) * pb) + num(k.bonus)); });
+    out.init = sgn(md('dex') + num(M.initBonus));
+    out.pp = 10 + md('wis') + Math.floor((+M.skills.perception?.prof || 0) * pb) + num(M.skills.perception?.bonus) + num(M.ppBonus);
+    const sa = M.spellAbility || 'int';
+    out['sc.mod'] = sgn(md(sa)); out['sc.dc'] = 8 + pb + md(sa); out['sc.atk'] = sgn(pb + md(sa));
+    $$('[data-calc]').forEach(el => { const v = out[el.dataset.calc]; if (v != null) el.textContent = v; });
+    $$('[data-save]').forEach(b => b.dataset.p = M.abilities[b.dataset.save].save ? 1 : 0);
+    $$('[data-skill]').forEach(b => b.dataset.p = M.skills[b.dataset.skill]?.prof || 0);
+    $$('[data-ds]').forEach(r => $$('[data-dsi]', r).forEach(b => b.classList.toggle('on', +b.dataset.dsi <= (M.deathSaves?.[r.dataset.ds] || 0))));
+    $$('[data-slot]').forEach(r => { const s = M.slots[r.dataset.slot]; const t = num(s.total); $$('[data-si]', r).forEach(b => { const i = +b.dataset.si; b.classList.toggle('off', i >= t); b.classList.toggle('on', i < Math.min(num(s.expended), t)); }); });
+    $$('[data-attn]').forEach(d => d.classList.toggle('on', !!M.attunement[d.dataset.attn]));
+    if (fitBanner() && typeof SheetFrames !== 'undefined') SheetFrames.decorate($('#desk'));
+  }
+
+  // banner between the header and the stats: "Name the Species Class", dropping species, then class, when space runs out
+  // "Path of the Berserker" -> "Berserker", "Life Domain" -> "Life", "Fiend Patron" -> "Fiend", "Draconic Sorcery" -> "Draconic"
+  const shortSub = s => String(s || '').trim()
+    .replace(/^(Path|College|Circle|Oath|Way|Warrior|Order|School|Domain|Conclave|Archetype|Tradition|Guild)\s+of\s+(the\s+)?/i, '')
+    .replace(/\s+(Domain|Patron|Sorcery|Archetype|Tradition)$/i, '').trim();
+  function bannerCandidates() {
+    const one = s => String(s || '').replace(/\s+/g, ' ').trim();
+    const name = one(M.name);
+    if (!name) return ['Character Sheet'];
+    // classes come from the Class field ("Fighter 5 / Wizard 3"); subclasses from the Subclass field
+    const names = one(M.className).split('/').map(c => c.replace(/\s*\d+\s*/g, ' ').trim()).filter(Boolean);
+    const subsRaw = one(M.subclass).split('/').map(s => s.trim()).filter(Boolean);
+    const known = Array.isArray(M.classList) ? M.classList : [];
+    const cls = names.map((n, i) => {
+      let sub = '';
+      if (names.length === 1) sub = subsRaw.join(' ');
+      else if (subsRaw.length === names.length) sub = subsRaw[i];
+      else { const k = known.find(c => c.name.toLowerCase() === n.toLowerCase()); if (k && subsRaw.includes(k.sub)) sub = k.sub; }
+      return { name: n, sub: shortSub(sub) };
+    });
+    const sp = one(M.species);
+    const joinAll = list => list.length <= 1 ? (list[0] || '') : list.length === 2 ? `${list[0]} & ${list[1]}` : `${list.slice(0, -1).join(', ')} & ${list[list.length - 1]}`;
+    const withSub = c => (c.sub ? c.sub + ' ' : '') + c.name;
+    const [first, ...rest] = cls;
+    const out = [];
+    const add = (...parts) => { const t = name + (parts.filter(Boolean).length ? ' the ' + parts.filter(Boolean).join(' ') : ''); if (!out.includes(t)) out.push(t); };
+    if (first) {
+      add(sp, joinAll([withSub(first), ...rest.map(withSub)]));      // everything
+      add(joinAll([withSub(first), ...rest.map(withSub)]));          // drop species
+      if (rest.length) add(joinAll([withSub(first), ...rest.map(c => c.name)])); // drop the other classes' subclasses
+      if (rest.length) add(withSub(first));                          // drop the other classes
+      add(first.name);                                               // drop the subclass
+    } else if (sp) add(sp);
+    out.push(name);
+    return out;
+  }
+  let lastBanner = '';
+  function fitBanner() {
+    const dv = $('.divider span'); if (!dv) return false;
+    const lim = dv.parentElement.clientWidth * 0.62;
+    const cands = bannerCandidates();
+    for (let i = 0; i < cands.length; i++) {
+      const last = i === cands.length - 1;
+      dv.textContent = cands[i]; dv.style.fontSize = ''; dv.style.letterSpacing = '';
+      let fs = parseFloat(getComputedStyle(dv).fontSize), ls = 0.22;
+      const minFs = last ? 9 : 11.5;
+      while (dv.scrollWidth > lim && fs > minFs) { if (ls > 0.08) ls -= 0.03; else fs -= 0.5; dv.style.letterSpacing = ls + 'em'; dv.style.fontSize = fs + 'px'; }
+      if (dv.scrollWidth <= lim || last) break;
+    }
+    const changed = dv.textContent + dv.style.fontSize + dv.style.letterSpacing !== lastBanner;
+    lastBanner = dv.textContent + dv.style.fontSize + dv.style.letterSpacing;
+    return changed;
+  }
+  // ---------- fit text to boxes ----------
+  function fit(el) {
+    if (el.parentElement?.classList.contains('flow')) return;
+    el.classList.remove('over');
+    let s = 1; el.style.setProperty('--fs', 1);
+    const over = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+    while (over() && s > 0.8) { s -= 0.025; el.style.setProperty('--fs', s.toFixed(2)); }
+    el.classList.toggle('over', over());
+  }
+  // wrap first; only shrink as much as needed for the wrapped text to fit the space
+  function fitWrap(el) {
+    const cs = getComputedStyle(el);
+    const maxH = parseFloat(cs.getPropertyValue('--mh')) || (parseFloat(cs.getPropertyValue('--rh')) - 1) || 24;
+    const hasBreak = /\n/.test(el.value);
+    el.style.fontSize = ''; el.style.whiteSpace = hasBreak ? '' : 'nowrap'; el.style.height = '0px';
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    let s = base;
+    // 1) a gentle shrink keeps short overflows on one line
+    const shrink = parseFloat(cs.getPropertyValue('--shrink')) || 0.86;
+    while (el.scrollWidth > el.clientWidth + 1 && s > base * shrink) { s -= 0.5; el.style.fontSize = s + 'px'; }
+    if (hasBreak || el.scrollWidth > el.clientWidth + 1) {
+      // 2) still too long: wrap onto more lines, shrinking only as far as the space requires
+      el.style.whiteSpace = ''; s = base * Math.min(0.92, shrink + 0.06); el.style.fontSize = s + 'px';
+      const minS = Math.max(8.5, base * 0.6);
+      while ((el.scrollHeight > maxH + 0.5 || el.scrollWidth > el.clientWidth + 1) && s > minS) { s -= 0.5; el.style.fontSize = s + 'px'; }
+    }
+    el.style.height = Math.min(el.scrollHeight, maxH) + 'px';
+    el.classList.toggle('multi', hasBreak || el.style.whiteSpace !== 'nowrap');
+  }
+  const fitField = el => el.tagName === 'TEXTAREA' ? fitWrap(el) : fitInput(el);
+  function fitInput(i) {
+    i.style.fontSize = '';
+    let s = parseFloat(getComputedStyle(i).fontSize);
+    const min = i.classList.contains('asub') ? 6.5 : 8;
+    while (i.scrollWidth > i.clientWidth + 1 && s > min) { s -= 0.25; i.style.fontSize = s + 'px'; }
+  }
+  // give Species/Feats more height when they need it and Class Features can spare it
+  function balance() {
+    const pair = $('.pair'), feat = $('#f-classFeaturesHtml'); if (!pair || !feat) return;
+    const sp = $('#f-speciesHtml'), ft = $('#f-featsHtml');
+    const fsOf = el => { fit(el); return (+el.style.getPropertyValue('--fs') || 1) - (el.classList.contains('over') ? 1 : 0); };
+    let best = 262, bestR = 1, bestScore = -9;
+    for (const r of [1, 1.35, 1.8, 0.74]) {
+      pair.style.gridTemplateColumns = `${r}fr 1fr`;
+      for (let h = 200; h <= 480; h += 14) {
+        pair.style.height = h + 'px';
+        const score = Math.min(fsOf(feat), fsOf(sp), fsOf(ft));
+        if (score > bestScore + 0.005) { bestScore = score; best = h; bestR = r; }
+      }
+    }
+    pair.style.gridTemplateColumns = `${bestR}fr 1fr`;
+    pair.style.height = best + 'px';
+  }
+  function fitAll() {
+    // frame classes change paddings, so apply them before measuring text
+    if (typeof SheetFrames !== 'undefined') SheetFrames.decorate($('#desk'));
+    balance();
+    $$('#desk textarea.fld').forEach(fitWrap);
+    $$('#desk .vit input.fld, #desk .lvl input.fld, #desk .tbl input.fld, #desk .coins input.fld, #desk .apa input.fld').forEach(fitInput);
+    $$('.rich.fit').forEach(fit);
+    const n = $$('.rich.over').length;
+    fitBanner();
+    if (typeof SheetFrames !== 'undefined') SheetFrames.decorate($('#desk'));
+    status(n ? `${n} box${n > 1 ? 'es are' : ' is'} too full to print completely (marked in red). Trim text or move it to Notes.` : '', !!n);
+  }
+  let fitT; const fitSoon = el => { clearTimeout(fitT); fitT = setTimeout(() => el ? (fit(el), fitAll()) : fitAll(), 120); };
+
+  // ---------- render ----------
+  function render() {
+    const desk = $('#desk');
+    desk.innerHTML = page1() + (M.noSpells ? page2lite() : page2() + spellCont()) + refPages();
+    // hide empty notes page in print
+    paintChips(desk);
+    applyLock(); refresh(); zoom();
+    requestAnimationFrame(() => (document.fonts?.ready || Promise.resolve()).then(fitAll));
+    renderPicker();
+    $('#bSpells').setAttribute('aria-pressed', !M.noSpells);
+    $('#bAvatar').setAttribute('aria-pressed', !!M.showAvatar);
+    document.title = (M.name ? M.name + ' · ' : '') + 'Sheetwright';
+  }
+  function zoom() { const w = $('#desk').clientWidth - 32; document.documentElement.style.setProperty('--z', Math.min(1.2, w / 816).toFixed(3)); $$('.page').forEach(p => p.style.setProperty('--z', Math.min(1.2, w / 816).toFixed(3))); }
+  function applyLock() {
+    const locked = !!prefs.locked;
+    document.body.classList.toggle('locked', locked);
+    $$('#desk .fld').forEach(i => i.readOnly = locked);
+    $$('#desk [data-rich]').forEach(r => r.contentEditable = locked ? 'false' : 'true');
+    $$('#desk select').forEach(s => s.disabled = locked);
+    $('#bLock').setAttribute('aria-pressed', locked); $('#bLock').textContent = locked ? 'Locked' : 'Editing';
+  }
+
+  // ---------- events ----------
+  function bind() {
+    const desk = $('#desk');
+    desk.addEventListener('input', e => {
+      const el = e.target.closest('[data-k]'); if (!el || !M) return;
+      const k = el.dataset.k;
+      if (el.hasAttribute('data-rich')) { set(M, k, el.innerHTML); fitSoon(el); }
+      else if (el.hasAttribute('data-bool')) set(M, k, el.checked);
+      else { set(M, k, el.value); if (el.classList.contains('fld')) fitField(el); }
+      if (k === 'level') { const l = num(el.value); if (l >= 1 && l <= 20) { M.profBonus = Math.ceil(l / 4) + 1; const pbf = $('#f-profBonus'); if (pbf) pbf.value = M.profBonus; } }
+      if (/^(attacks|spells)\.\d+\.notes$|^senses|^defenses/.test(k)) {}
+      refresh(); markDirty(); save();
+    });
+    desk.addEventListener('change', e => { if (e.target.matches('select[data-k]')) { set(M, e.target.dataset.k, e.target.value); refresh(); save(); } });
+    desk.addEventListener('click', e => {
+      if (prefs.locked || !M) return;
+      const star = e.target.closest('span.uses i, span.uses em');
+      if (star) {
+        const c = star.closest('span.uses'), rich = c.closest('[data-rich]');
+        const n = parseInt(c.dataset.n, 10) || 0, used = parseInt(c.dataset.used, 10) || 0;
+        if (e.shiftKey) c.dataset.n = Math.min(20, n + 1);
+        else if (e.altKey) { c.dataset.n = Math.max(0, n - 1); if (+c.dataset.n === 0) c.remove(); }
+        else if (star.tagName === 'I') { const i = +star.dataset.ui; c.dataset.used = used === i + 1 ? i : i + 1; }
+        paintChips(rich); if (rich) set(M, rich.dataset.k, rich.innerHTML);
+        refresh(); markDirty(); save(); return;
+      }
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.save) { const a = M.abilities[b.dataset.save]; a.save = !a.save; }
+      else if (b.dataset.skill) { const s = M.skills[b.dataset.skill] ||= { prof: 0, bonus: 0 }; s.prof = { 0: 1, 1: 2, 2: 0, 0.5: 1 }[s.prof] ?? 0; }
+      else if (b.dataset.dsi) { const k = b.closest('[data-ds]').dataset.ds; const i = +b.dataset.dsi; M.deathSaves[k] = M.deathSaves[k] === i ? i - 1 : i; }
+      else if (b.dataset.si != null) { const s = M.slots[b.closest('[data-slot]').dataset.slot]; const i = +b.dataset.si; if (i >= num(s.total)) return; s.expended = num(s.expended) === i + 1 ? i : i + 1; }
+      else return;
+      refresh(); markDirty(); save();
+    });
+    // paste as plain text into rich fields
+    desk.addEventListener('paste', e => {
+      const el = e.target.closest('[data-rich]'); if (!el) return;
+      e.preventDefault();
+      const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, t);
+    });
+    desk.addEventListener('focusout', e => { const el = e.target.closest('[data-rich]'); if (el) { if (convertChipShorthand(el)) { set(M, el.dataset.k, el.innerHTML); save(); } fitSoon(el); } });
+    window.addEventListener('resize', zoom);
+    window.addEventListener('beforeprint', () => { $$('.rich.over').forEach(r => { r.scrollTop = 0; }); $$('.page').forEach(p => p.style.setProperty('--z', 1)); });
+    window.addEventListener('afterprint', zoom);
+  }
+  function markDirty() { if (M?.sample) { status('Sample sheet: edits are not saved. Import your own character to keep changes.'); } }
+
+  // ---------- library ----------
+  function renderPicker() {
+    const sel = $('#pick');
+    const ids = Object.keys(lib);
+    sel.innerHTML = (M?.sample ? '<option value="__sample" selected>Sylren (sample)</option>' : '') +
+      ids.map(i => `<option value="${esc(i)}" ${i === curId ? 'selected' : ''}>${esc(lib[i].name || 'Unnamed')}${lib[i].className ? ' · ' + esc(lib[i].className) + ' ' + esc(lib[i].level) : ''}</option>`).join('') +
+      '<option value="__new">+ New blank sheet</option>';
+  }
+  function open(idv) {
+    if (idv === '__new') { const k = 'local-' + Date.now(); lib[k] = blank(); idv = k; }
+    if (idv === '__sample' || !lib[idv]) { M = prepare(JSON.parse(JSON.stringify(SAMPLE))); curId = null; }
+    else { M = prepare(lib[idv]); curId = idv; store.set('cs.current', curId); }
+    store.set('cs.library', lib);
+    render();
+    $('#bDelete').hidden = !curId;
+  }
+  function importModel(m, how) {
+    m = prepare(m);
+    const k = m.source?.id ? 'ddb-' + m.source.id : 'local-' + Date.now();
+    lib[k] = m; curId = k;
+    store.set('cs.library', lib); store.set('cs.current', k);
+    open(k);
+    toast(`${how} ${m.name || 'character'}`);
+  }
+
+  // ---------- import dialog ----------
+  function handleText(txt, msgEl) {
+    let j;
+    try { j = JSON.parse(txt.trim()); } catch { msgEl.textContent = 'That is not valid JSON. Run the bookmarklet on your character page again, then paste.'; msgEl.className = 'msg err'; return false; }
+    try {
+      if (j.v === 1 && j.abilities) { importModel(sanitizeModel(j), 'Opened'); }
+      else {
+        const m = P.parse(j);
+        const k = 'ddb-' + m.source.id;
+        if (lib[k] && !msgEl.dataset.confirm) { pendingImport = m; msgEl.innerHTML = `You already have <b>${esc(lib[k].name)}</b> here. Re-importing replaces your edits to it.`; msgEl.className = 'msg err'; $('#bReplace').hidden = false; return false; }
+        importModel(m, 'Imported');
+      }
+      $('#dlgImport').close(); return true;
+    } catch (e) { msgEl.textContent = e.message; msgEl.className = 'msg err'; return false; }
+  }
+  let pendingImport = null;
+
+  const BOOKMARKLET = `(async()=>{try{const m=location.pathname.match(/characters\\/(\\d+)/);if(!location.host.endsWith('dndbeyond.com')||!m){alert('Open one of your characters on dndbeyond.com first, then click this bookmark.');return}const t=await fetch('https://auth-service.dndbeyond.com/v1/cobalt-token',{method:'POST',credentials:'include'}).then(r=>r.json()).catch(()=>({}));const r=await fetch('https://character-service.dndbeyond.com/character/v5/character/'+m[1]+'?includeCustomItems=true',{headers:t.token?{Authorization:'Bearer '+t.token}:{}});if(!r.ok)throw new Error('D&D Beyond answered '+r.status+'. Are you logged in, and can you view this character?');let j=await r.text();try{const o=JSON.parse(j);const u=o.data&&o.data.decorations&&o.data.decorations.avatarUrl;if(u){const b=await fetch(u).then(x=>x.blob());const im=await createImageBitmap(b);const s=Math.min(1,320/Math.min(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);o.__avatarData=c.toDataURL('image/jpeg',.85);j=JSON.stringify(o)}}catch(e){}let ok=false;try{await navigator.clipboard.writeText(j);ok=true}catch(e){const ta=document.createElement('textarea');ta.value=j;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy')}catch(_){}ta.remove()}if(ok){alert('Character copied! Switch to Sheetwright, click Import, and paste.')}else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='ddb-character-'+m[1]+'.json';a.click();alert('Clipboard was blocked, so the character was downloaded as a .json file instead. Import that file into Sheetwright.')}}catch(e){alert('Export failed: '+e.message)}})();`;
+  const USERSCRIPT = `// ==UserScript==
+// @name         Sheetwright: copy D&D Beyond character
+// @namespace    sheetwright
+// @version      1.1
+// @description  Adds a "Copy for Sheetwright" button to D&D Beyond character pages.
+// @match        https://www.dndbeyond.com/characters/*
+// @match        https://www.dndbeyond.com/profile/*/characters/*
+// @grant        GM_setClipboard
+// ==/UserScript==
+(function () {
+  const btn = document.createElement('button');
+  btn.textContent = 'Copy for Sheetwright';
+  Object.assign(btn.style, { position: 'fixed', right: '16px', bottom: '16px', zIndex: 99999, padding: '10px 16px', background: '#8c2129', color: '#fff', border: 0, borderRadius: '999px', font: '600 14px sans-serif', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0,0,0,.3)' });
+  btn.onclick = async () => {
+    const m = location.pathname.match(/characters\\/(\\d+)/); if (!m) return;
+    btn.textContent = 'Copying…';
+    try {
+      const t = await fetch('https://auth-service.dndbeyond.com/v1/cobalt-token', { method: 'POST', credentials: 'include' }).then(r => r.json()).catch(() => ({}));
+      const r = await fetch('https://character-service.dndbeyond.com/character/v5/character/' + m[1] + '?includeCustomItems=true', { headers: t.token ? { Authorization: 'Bearer ' + t.token } : {} });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      let j = await r.text();
+      try { // include the portrait, shrunk, so Sheetwright can show it
+        const o = JSON.parse(j); const u = o.data && o.data.decorations && o.data.decorations.avatarUrl;
+        if (u) { const im = await createImageBitmap(await fetch(u).then(x => x.blob())); const s = Math.min(1, 320 / Math.min(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); o.__avatarData = c.toDataURL('image/jpeg', .85); j = JSON.stringify(o); }
+      } catch (e) {}
+      GM_setClipboard(j, 'text');
+      btn.textContent = 'Copied! Paste into Sheetwright';
+    } catch (e) { btn.textContent = 'Failed: ' + e.message; }
+    setTimeout(() => (btn.textContent = 'Copy for Sheetwright'), 4000);
+  };
+  document.body.appendChild(btn);
+})();`;
+
+  async function copy(text, okMsg, fallbackEl) {
+    try { await navigator.clipboard.writeText(text); toast(okMsg); }
+    catch { if (fallbackEl) { fallbackEl.hidden = false; fallbackEl.value = text; fallbackEl.select(); toast('Press Ctrl+C / ⌘C to copy the selected text'); } }
+  }
+  function download(name, text) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  // ---------- chrome ----------
+  let toastT;
+  function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600); }
+  function status(t, warn) { const el = $('#status'); el.textContent = t || ''; el.classList.toggle('warn', !!warn); }
+
+  // ---------- formatting bar for rich text boxes ----------
+  function initFormatBar() {
+    const bar = $('#fmt'); let cur = null, hideT = null;
+    const place = () => {
+      if (!cur) return;
+      const r = cur.getBoundingClientRect(), bh = bar.offsetHeight || 32;
+      let top = r.top - bh - 6; if (top < 70) top = Math.min(window.innerHeight - bh - 8, r.bottom + 6);
+      bar.style.top = top + 'px';
+      bar.style.left = Math.max(8, Math.min(window.innerWidth - bar.offsetWidth - 8, r.left)) + 'px';
+    };
+    const headTag = () => { const n = getSelection().anchorNode; const el = n && (n.nodeType === 1 ? n : n.parentElement); const h = el?.closest('h3,h4'); return h && cur?.contains(h) ? h.tagName.toLowerCase() : null; };
+    const inHeading = () => !!headTag();
+    // lists and headings don't nest: leave a heading before starting a list
+    const leaveHeading = () => { if (inHeading()) document.execCommand('formatBlock', false, 'p'); };
+    // pressing Enter at the end of a heading starts a normal paragraph
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || !cur || !e.target.closest?.('#desk [data-rich]') || !inHeading()) return;
+      setTimeout(() => { const n = getSelection().anchorNode; const el = n && (n.nodeType === 1 ? n : n.parentElement); const h = el?.closest('h3,h4'); if (h && !h.textContent.trim()) document.execCommand('formatBlock', false, 'p'); }, 0);
+    });
+    const sync = () => {
+      if (!cur) return;
+      $$('button[data-cmd]', bar).forEach(b => {
+        const c = b.dataset.cmd; let on = false;
+        try { on = /^(bold|italic|underline|insertUnorderedList|insertOrderedList)$/.test(c) && document.queryCommandState(c); } catch {}
+        if (c === 'heading') on = headTag() === 'h4';
+        if (c === 'section') on = headTag() === 'h3';
+        b.setAttribute('aria-pressed', on);
+      });
+    };
+    document.addEventListener('focusin', e => {
+      const el = e.target.closest?.('#desk [data-rich]');
+      if (!el || prefs.locked) return;
+      clearTimeout(hideT); cur = el; bar.hidden = false; place(); sync();
+    });
+    document.addEventListener('focusout', e => {
+      if (!e.target.closest?.('#desk [data-rich]')) return;
+      hideT = setTimeout(() => { if (!bar.matches(':hover')) { bar.hidden = true; cur = null; } }, 150);
+    });
+    document.addEventListener('selectionchange', sync);
+    window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
+    bar.addEventListener('mousedown', e => e.preventDefault()); // keep the text selection
+    bar.addEventListener('click', e => {
+      const b = e.target.closest('button[data-cmd]'); if (!b || !cur) return;
+      cur.focus();
+      const c = b.dataset.cmd;
+      if (c === 'heading' || c === 'section') {
+        const want = c === 'section' ? 'h3' : 'h4';
+        document.execCommand('formatBlock', false, headTag() === want ? 'p' : want);
+      } else if (c === 'tracker') {
+        document.execCommand('insertHTML', false, ' ' + P.usesChip({ n: 2, used: 0, reset: 'LR' }) + '&nbsp;');
+        paintChips(cur);
+      } else if (/List$/.test(c)) {
+        leaveHeading(); document.execCommand(c);
+      } else if (c === 'removeFormat') {
+        document.execCommand('removeFormat'); leaveHeading();
+      } else document.execCommand(c);
+      set(M, cur.dataset.k, cur.innerHTML); save(); fitSoon(cur); sync(); place();
+    });
+  }
+
+  function init() {
+    const bm = $('#bmk'); bm.href = 'javascript:' + encodeURIComponent(BOOKMARKLET);
+    bm.addEventListener('click', e => { e.preventDefault(); toast('Drag this button to your bookmarks bar'); });
+    $('#bCopyBm').onclick = () => copy('javascript:' + BOOKMARKLET, 'Bookmarklet code copied', $('#fallback'));
+    $('#bCopyUs').onclick = () => copy(USERSCRIPT, 'Userscript copied. Paste it into a new Tampermonkey script.', $('#fallback'));
+    $('#bImport').onclick = () => { $('#imMsg').textContent = ''; $('#imMsg').dataset.confirm = ''; $('#bReplace').hidden = true; $('#paste').value = ''; $('#dlgImport').showModal(); };
+    $('#bCloseIm').onclick = () => $('#dlgImport').close();
+    $('#paste').addEventListener('paste', e => { const t = e.clipboardData.getData('text/plain'); if (t && t.length > 200) { e.preventDefault(); $('#paste').value = t.slice(0, 400) + (t.length > 400 ? '\n… (' + Math.round(t.length / 1024) + ' KB)' : ''); $('#paste')._full = t; handleText(t, $('#imMsg')); } });
+    $('#bLoad').onclick = () => handleText($('#paste')._full || $('#paste').value, $('#imMsg'));
+    $('#bReplace').onclick = () => { if (pendingImport) { importModel(pendingImport, 'Re-imported'); pendingImport = null; $('#dlgImport').close(); } };
+    $('#file').addEventListener('change', async e => { const fl = e.target.files[0]; if (fl) handleText(await fl.text(), $('#imMsg')); e.target.value = ''; });
+    const dlg = $('#dlgImport');
+    dlg.addEventListener('dragover', e => e.preventDefault());
+    dlg.addEventListener('drop', async e => { e.preventDefault(); const fl = e.dataTransfer.files[0]; if (fl) handleText(await fl.text(), $('#imMsg')); });
+
+    $('#bExport').onclick = () => { $('#dlgExport').showModal(); $('#fallback').hidden = true; };
+    $('#bCloseEx').onclick = () => $('#dlgExport').close();
+    $('#bExCopy').onclick = () => copy(JSON.stringify(M), 'Sheet JSON copied', $('#fallback'));
+    $('#bExDl').onclick = () => download((M.name || 'character').replace(/[^\w-]+/g, '_') + '.sheet.json', JSON.stringify(M, null, 1));
+    $('#bPrint').onclick = () => { $$('.page').forEach(p => p.style.setProperty('--z', 1)); fitAll(); window.print(); };
+    if (framed) { $('#bPrint').hidden = true; $('#bExDl').hidden = true; $('#printNote').hidden = false; }
+    $('#bLock').onclick = () => { prefs.locked = !prefs.locked; store.set('cs.prefs', prefs); applyLock(); };
+    $('#bRef').setAttribute('aria-pressed', !!prefs.ref);
+    $('#bAvatar').onclick = () => { if (!M) return; M.showAvatar = !M.showAvatar; save(); render(); toast(M.showAvatar ? 'Portrait shown' : 'Portrait hidden for this character'); };
+    $('#avatarFile').addEventListener('change', async e => {
+      const fl = e.target.files[0]; e.target.value = ''; if (!fl || !M) return;
+      try {
+        const im = await createImageBitmap(fl); const s = Math.min(1, 320 / Math.min(im.width, im.height));
+        const c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        M.avatar = c.toDataURL('image/jpeg', 0.85); M.avatarX = 50; M.avatarY = 25; M.showAvatar = true; save(); render(); toast('Portrait updated');
+      } catch { toast('That file could not be read as an image'); }
+    });
+    // portrait: drag to choose which part of the picture shows; a plain click picks a new picture
+    let drag = null;
+    $('#desk').addEventListener('pointerdown', e => {
+      const img = e.target.closest('#portrait img'); if (!img || prefs.locked) return;
+      e.preventDefault(); img.setPointerCapture(e.pointerId);
+      drag = { img, x: e.clientX, y: e.clientY, ox: num(M.avatarX ?? 50), oy: num(M.avatarY ?? 25), moved: false };
+    });
+    $('#desk').addEventListener('pointermove', e => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      const r = drag.img.getBoundingClientRect();
+      M.avatarX = Math.max(0, Math.min(100, drag.ox - dx / r.width * 100));
+      M.avatarY = Math.max(0, Math.min(100, drag.oy - dy / r.height * 100));
+      drag.img.style.objectPosition = `${M.avatarX}% ${M.avatarY}%`;
+    });
+    $('#desk').addEventListener('pointerup', () => { if (!drag) return; const moved = drag.moved; drag = null; if (moved) save(); else $('#avatarFile').click(); });
+    $('#desk').addEventListener('click', e => { if (e.target.closest('#portrait .ph') && !prefs.locked) $('#avatarFile').click(); });
+    $('#bSpells').onclick = () => { if (!M) return; M.noSpells = !M.noSpells; save(); render(); toast(M.noSpells ? 'Spellcasting hidden for this character' : 'Spellcasting shown'); };
+    const syncTrk = () => { document.body.classList.toggle('trk-blank', prefs.trk !== false); $('#bTrk').setAttribute('aria-pressed', prefs.trk !== false); };
+    syncTrk();
+    $('#bTrk').onclick = () => { prefs.trk = prefs.trk === false; store.set('cs.prefs', prefs); syncTrk(); toast(prefs.trk ? 'Trackers will print blank' : 'Trackers will print with current values'); };
+    $('#bRef').onclick = () => { prefs.ref = !prefs.ref; store.set('cs.prefs', prefs); $('#bRef').setAttribute('aria-pressed', prefs.ref); render(); };
+    $('#pick').onchange = e => open(e.target.value);
+    $('#bDelete').onclick = () => { $('#delName').textContent = M.name || 'this sheet'; $('#dlgDelete').showModal(); };
+    $('#bDelNo').onclick = () => $('#dlgDelete').close();
+    $('#bDelYes').onclick = () => { delete lib[curId]; store.set('cs.library', lib); $('#dlgDelete').close(); const k = Object.keys(lib)[0]; open(k || '__sample'); toast('Sheet deleted'); };
+    bind();
+    initFormatBar();
+    open(curId && lib[curId] ? curId : (Object.keys(lib)[0] || '__sample'));
+    if (!Object.keys(lib).length) status('Showing a sample character. Click Import to bring in your own from D&D Beyond.');
+  }
+  // test hook
+  window.__sheet = { get model() { return M; }, importDDB: j => importModel(P.parse(j), 'Imported'), fitAll };
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
+})();
+</script>
+
+</body>
+</html>
