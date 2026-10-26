@@ -261,6 +261,23 @@ dialog::backdrop { background: rgba(10,10,14,.5) }
 .brand { display: inline-flex; align-items: center; gap: 6px; line-height: 1 }
 .brand .plus { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 6px; margin: 0; line-height: 1; color: #fff; background: var(--accent); border-radius: 5px; font: 800 14px/1 var(--f-ui); letter-spacing: 0 }
 .brand .plus { height: 24px; padding: 0 7px; font-size: 17px }
+/* d20 logo mark */
+.brand .d20 { display: inline-flex; width: 34px; height: 37px; flex: none }
+.brand .d20 svg { width: 100%; height: 100%; overflow: visible }
+.d20-body { fill: var(--accent); stroke: #5e1419; stroke-width: 3; stroke-linejoin: round }
+.d20-face { fill: #a8323a; stroke: #f3d9d9; stroke-width: 2.5; stroke-linejoin: round }
+.d20-edge { stroke: #f3d9d9; stroke-opacity: .55; stroke-width: 2.5; fill: none; stroke-linecap: round }
+.d20 text { font: 800 30px var(--f-ui); fill: #fff; letter-spacing: -1px }
+.d20 text { font-size: 33px } .brand .d20 { width: 36px; height: 39px }
+.d20 text { font-size: 46px; letter-spacing: -2px; paint-order: stroke; stroke: #7a1b22; stroke-width: 3px; stroke-linejoin: round }
+.d20-edge { stroke-opacity: .22 }
+.d20-face { stroke: rgba(243, 217, 217, .45); fill: #9c2a32 }
+.brand .d20 { width: 38px; height: 41px }
+/* numeral spans the whole die; facets are only a faint suggestion */
+.d20 text { font-size: 60px; letter-spacing: -3px; stroke-width: 4px }
+.d20-edge { stroke-opacity: .1 }
+.d20-face { stroke: rgba(243, 217, 217, .18); fill: #962830 }
+.brand { gap: 3px } .brand .d20 { margin: 0 -1px }
 
 /* ===== Official-style frames (SVG drawn by frames.js) ===== */
 .page {
@@ -680,12 +697,17 @@ button.dia { padding: 0 }
 @media print {
   .page.flow, .page.flow.p2lite { page: ref; padding-bottom: .12in !important }
 }
+.portrait .ph { font-size: 9px; line-height: 1.25; padding: 4px }
 </style>
 
 </head>
 <body>
 <header class="bar">
-  <div class="brand"><span class="the">The</span><span class="plus">+1</span><span>Character Sheet</span></div>
+  <div class="brand"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
+    <polygon class="d20-body" points="50,3 94,28 94,82 50,107 6,82 6,28"/>
+    <polygon class="d20-face" points="50,22 82,76 18,76"/>
+    <path class="d20-edge" d="M50,3 L50,22 M94,28 L82,76 M6,28 L18,76 M50,107 L18,76 M50,107 L82,76 M94,28 L50,22 M6,28 L50,22 M94,82 L82,76 M6,82 L18,76"/>
+    <text x="50" y="72" text-anchor="middle">+1</text></svg></span><span>Character Sheet</span></div>
   <select id="pick" aria-label="Choose character"></select>
   <button class="btn primary" id="bImport">Import</button>
   <button class="btn" id="bExport">Export</button>
@@ -1437,12 +1459,45 @@ const SheetFrames = (() => {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
   };
-  let lib = store.get('cs.library', {});
+  // Character library lives in IndexedDB (room for portraits and full rules text);
+  // localStorage is only a fallback when IndexedDB isn't available.
+  const idb = (() => {
+    let dbp = null;
+    const open = () => dbp ||= new Promise((res, rej) => {
+      try { const r = indexedDB.open('plus-one-sheet', 1); r.onupgradeneeded = () => r.result.createObjectStore('chars');
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); }
+    });
+    const tx = (mode, fn) => open().then(db => new Promise((res, rej) => { const t = db.transaction('chars', mode); const s = t.objectStore('chars'); const out = fn(s); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }));
+    return {
+      async all() { const db = await open(); return new Promise((res, rej) => { const o = {}; const r = db.transaction('chars').objectStore('chars').openCursor(); r.onsuccess = () => { const c = r.result; if (c) { o[c.key] = c.value; c.continue(); } else res(o); }; r.onerror = () => rej(r.error); }); },
+      put: (k, v) => tx('readwrite', s => s.put(v, k)),
+      del: k => tx('readwrite', s => s.delete(k))
+    };
+  })();
+  let useIdb = false, saveError = false;
+  let lib = {};
+  async function loadLibrary() {
+    const legacy = store.get('cs.library', null);
+    try {
+      lib = await idb.all(); useIdb = true;
+      if (legacy && Object.keys(legacy).length) {   // move sheets saved by older versions over, then free localStorage
+        for (const [k, v] of Object.entries(legacy)) if (!lib[k]) { lib[k] = v; await idb.put(k, v); }
+        try { localStorage.removeItem('cs.library'); } catch {}
+      }
+    } catch { useIdb = false; lib = legacy || {}; }
+  }
+  const saveFailed = () => { saveError = true; status('Your latest changes could not be saved in this browser (storage is full or blocked). Use Export to keep a copy.', true); };
+  const persist = k => {
+    if (!k || !lib[k]) return;
+    if (useIdb) idb.put(k, lib[k]).then(() => { if (saveError) { saveError = false; status(''); } }, saveFailed);
+    else if (!store.set('cs.library', lib)) saveFailed();
+  };
+  const unpersist = k => { if (useIdb) idb.del(k).catch(() => {}); else store.set('cs.library', lib); };
   let curId = store.get('cs.current', null);
   let prefs = Object.assign({ ref: true }, store.get('cs.prefs', {}));
   let M = null;
   let saveT = null;
-  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { if (!M || M.sample) return; lib[curId] = M; if (!store.set('cs.library', lib)) status('Could not save in this browser. Use Export to keep a copy.', true); }, 250); };
+  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { if (!M || M.sample) return; lib[curId] = M; persist(curId); }, 250); };
 
   // ---------- sanitize (for pasted/imported html) ----------
   function sanitize(html) {
@@ -1853,6 +1908,15 @@ const SheetFrames = (() => {
     desk.innerHTML = page1() + (M.noSpells ? page2lite() : page2() + spellCont()) + refPages();
     // hide empty notes page in print
     paintChips(desk);
+    // a portrait saved as a web address (older bookmark) can break later: try to keep a copy, explain if it fails
+    const pimg = $('#portrait img');
+    if (pimg && /^https?:/i.test(M.avatar || '')) {
+      const keep = M, url = M.avatar;
+      pimg.onerror = () => { const ph = document.createElement('span'); ph.className = 'ph'; ph.innerHTML = 'Portrait<br>not saved.<br>Re-import or<br>click to add'; pimg.replaceWith(ph); };
+      const probe = new Image(); probe.crossOrigin = 'anonymous';
+      probe.onload = () => { try { const s = Math.min(1, 320 / Math.min(probe.naturalWidth, probe.naturalHeight)); const c = document.createElement('canvas'); c.width = Math.round(probe.naturalWidth * s); c.height = Math.round(probe.naturalHeight * s); c.getContext('2d').drawImage(probe, 0, 0, c.width, c.height); if (keep.avatar === url) { keep.avatar = c.toDataURL('image/jpeg', 0.85); save(); } } catch {} };
+      probe.src = url;
+    }
     applyLock(); refresh(); zoom();
     requestAnimationFrame(() => (document.fonts?.ready || Promise.resolve()).then(fitAll));
     renderPicker();
@@ -1936,10 +2000,9 @@ const SheetFrames = (() => {
       '<option value="__new">+ New blank sheet</option>';
   }
   function open(idv) {
-    if (idv === '__new') { const k = 'local-' + Date.now(); lib[k] = blank(); idv = k; }
+    if (idv === '__new') { const k = 'local-' + Date.now(); lib[k] = blank(); idv = k; persist(k); }
     if (idv === '__sample' || !lib[idv]) { M = prepare(JSON.parse(JSON.stringify(SAMPLE))); curId = null; }
     else { M = prepare(lib[idv]); curId = idv; store.set('cs.current', curId); }
-    store.set('cs.library', lib);
     render();
     $('#bDelete').hidden = !curId;
   }
@@ -1947,7 +2010,7 @@ const SheetFrames = (() => {
     m = prepare(m);
     const k = m.source?.id ? 'ddb-' + m.source.id : 'local-' + Date.now();
     lib[k] = m; curId = k;
-    store.set('cs.library', lib); store.set('cs.current', k);
+    persist(k); store.set('cs.current', k);
     open(k);
     toast(`${how} ${m.name || 'character'}`);
   }
@@ -2015,7 +2078,7 @@ const SheetFrames = (() => {
   // ---------- chrome ----------
   let toastT;
   function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600); }
-  function status(t, warn) { const el = $('#status'); el.textContent = t || ''; el.classList.toggle('warn', !!warn); }
+  function status(t, warn) { if (saveError && !warn) return; const el = $('#status'); el.textContent = t || ''; el.classList.toggle('warn', !!warn); }
 
   // ---------- formatting bar for rich text boxes ----------
   function initFormatBar() {
@@ -2136,11 +2199,13 @@ const SheetFrames = (() => {
     $('#pick').onchange = e => open(e.target.value);
     $('#bDelete').onclick = () => { $('#delName').textContent = M.name || 'this sheet'; $('#dlgDelete').showModal(); };
     $('#bDelNo').onclick = () => $('#dlgDelete').close();
-    $('#bDelYes').onclick = () => { delete lib[curId]; store.set('cs.library', lib); $('#dlgDelete').close(); const k = Object.keys(lib)[0]; open(k || '__sample'); toast('Sheet deleted'); };
+    $('#bDelYes').onclick = () => { const gone = curId; delete lib[gone]; unpersist(gone); $('#dlgDelete').close(); const k = Object.keys(lib)[0]; open(k || '__sample'); toast('Sheet deleted'); };
     bind();
     initFormatBar();
+    loadLibrary().then(() => {
     open(curId && lib[curId] ? curId : (Object.keys(lib)[0] || '__sample'));
     if (!Object.keys(lib).length) status('Showing a sample character. Click Import to bring in your own from D&D Beyond.');
+    });
   }
   // test hook
   window.__sheet = { get model() { return M; }, importDDB: j => importModel(P.parse(j), 'Imported'), fitAll };
