@@ -703,7 +703,7 @@ button.dia { padding: 0 }
 </head>
 <body>
 <header class="bar">
-  <div class="brand" title="Build 2026-10-26 21:09 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
+  <div class="brand" title="Build 2026-10-26 21:16 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
     <polygon class="d20-body" points="50,3 94,28 94,82 50,107 6,82 6,28"/>
     <polygon class="d20-face" points="50,22 82,76 18,76"/>
     <path class="d20-edge" d="M50,3 L50,22 M94,28 L82,76 M6,28 L18,76 M50,107 L18,76 M50,107 L82,76 M94,28 L50,22 M6,28 L50,22 M94,82 L82,76 M6,82 L18,76"/>
@@ -1446,6 +1446,8 @@ const SheetFrames = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const sgn = n => (n >= 0 ? '+' : '') + n;
   const num = v => { const n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); return isNaN(n) ? 0 : n; };
+  // portrait crop position: a percentage 0–100 (keeps decimals; num() would turn 85.25 into 8525)
+  const pct = (v, d) => { const n = parseFloat(v); return isFinite(n) ? Math.max(0, Math.min(100, Math.round(n * 10) / 10)) : d; };
   const mod = s => Math.floor((num(s) - 10) / 2);
   const get = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
   const set = (o, p, v) => {
@@ -1621,7 +1623,7 @@ const SheetFrames = (() => {
     }
     return `<div class="page" id="pg1"><div class="p1">
       <div class="hdr${M.showAvatar ? ' with-portrait' : ''}">
-        ${M.showAvatar ? `<div class="portrait" id="portrait" title="Click to choose a picture">${M.avatar ? `<img src="${esc(M.avatar)}" alt="" draggable="false" style="object-position:${num(M.avatarX ?? 50)}% ${num(M.avatarY ?? 25)}%">` : '<span class="ph">Add a<br>portrait</span>'}</div>` : ''}
+        ${M.showAvatar ? `<div class="portrait" id="portrait" title="Click to choose a picture">${M.avatar ? `<img src="${esc(M.avatar)}" alt="" draggable="false" style="object-position:${pct(M.avatarX, 50)}% ${pct(M.avatarY, 25)}%">` : '<span class="ph">Add a<br>portrait</span>'}</div>` : ''}
         <section class="box ident">
           <label class="lbl"><span class="cap">Character Name</span>${t('name', 'namefld nob')}</label>
           <div class="row"><label class="lbl"><span class="cap">Background</span>${t('background')}</label><label class="lbl"><span class="cap">Class</span>${t('className')}</label></div>
@@ -2178,15 +2180,15 @@ const SheetFrames = (() => {
     $('#desk').addEventListener('pointerdown', e => {
       const img = e.target.closest('#portrait img'); if (!img || prefs.locked) return;
       e.preventDefault(); img.setPointerCapture(e.pointerId);
-      drag = { img, x: e.clientX, y: e.clientY, ox: num(M.avatarX ?? 50), oy: num(M.avatarY ?? 25), moved: false };
+      drag = { img, x: e.clientX, y: e.clientY, ox: pct(M.avatarX, 50), oy: pct(M.avatarY, 25), moved: false };
     });
     $('#desk').addEventListener('pointermove', e => {
       if (!drag) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
       const r = drag.img.getBoundingClientRect();
-      M.avatarX = Math.max(0, Math.min(100, drag.ox - dx / r.width * 100));
-      M.avatarY = Math.max(0, Math.min(100, drag.oy - dy / r.height * 100));
+      M.avatarX = pct(drag.ox - dx / r.width * 100, 50);
+      M.avatarY = pct(drag.oy - dy / r.height * 100, 25);
       drag.img.style.objectPosition = `${M.avatarX}% ${M.avatarY}%`;
     });
     $('#desk').addEventListener('pointerup', () => { if (!drag) return; const moved = drag.moved; drag = null; if (moved) save(); else $('#avatarFile').click(); });
