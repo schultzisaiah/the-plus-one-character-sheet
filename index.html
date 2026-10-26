@@ -1612,7 +1612,7 @@ const SheetFrames = (() => {
       if (!ok.has(c.tagName)) { c.replaceWith(...c.childNodes); return; }
       const isChip = c.tagName === 'SPAN' && c.classList.contains('uses');
       [...c.attributes].forEach(a => { if (!(a.name === 'class' && /^(meta|uses)$/.test(a.value)) && !(isChip && /^data-(n|used|reset)$/.test(a.name))) c.removeAttribute(a.name); });
-      if (isChip) { c.textContent = ''; c.setAttribute('contenteditable', 'false'); }
+      if (isChip) { c.textContent = ''; c.className = 'uses'; c.setAttribute('contenteditable', 'false'); }
     });
     const root = doc.body.firstChild; walk(root); return root.innerHTML;
   }
@@ -2172,12 +2172,22 @@ const SheetFrames = (() => {
       else return;
       refresh(); markDirty(); save();
     });
-    // paste as plain text into rich fields
+    // paste into rich fields: keep safe formatting (bold, italics, lists, use chips), else plain text
     desk.addEventListener('paste', e => {
       const el = e.target.closest('[data-rich]'); if (!el) return;
       e.preventDefault();
-      const t = (e.clipboardData || window.clipboardData).getData('text/plain');
-      document.execCommand('insertText', false, t);
+      const cd = e.clipboardData || window.clipboardData;
+      const h = cd.getData('text/html');
+      if (h) {
+        const body = (h.match(/<!--StartFragment-->([\s\S]*?)<!--EndFragment-->/) || [, h])[1];
+        const clean = sanitize(body.replace(/<!--[\s\S]*?-->/g, ''));
+        if (clean.trim()) {
+          document.execCommand('insertHTML', false, clean);
+          paintChips(el); set(M, el.dataset.k, el.innerHTML); save(); fitSoon(el);
+          return;
+        }
+      }
+      document.execCommand('insertText', false, cd.getData('text/plain'));
     });
     desk.addEventListener('focusout', e => { const el = e.target.closest('[data-rich]'); if (el) { if (convertChipShorthand(el)) { set(M, el.dataset.k, el.innerHTML); save(); } fitSoon(el); } });
     window.addEventListener('resize', zoom);
