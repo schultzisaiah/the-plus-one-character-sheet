@@ -567,7 +567,10 @@ span.uses.pool u { display: inline-block; width: 22px; border-bottom: 1px solid 
 /* ===== Too-full boxes scroll on screen so nothing is out of reach ===== */
 @media screen {
   .rich.over { overflow-y: auto !important; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #8c2129 transparent; box-shadow: inset 0 0 0 1.5px rgba(140,33,41,.55) !important; border-radius: 3px }
-  .features .rich.over { columns: 1 !important }
+  .features .rich.over { columns: auto !important }
+}
+.features .rich.one { columns: auto }
+@media screen {
   .rich.over::after { content: "Too full to print — scroll to see it all"; position: sticky; bottom: 0; display: block; margin-top: 6px; padding: 3px 6px; background: #8c2129; color: #fff; font: 700 8.5px/1.2 var(--f-ui); letter-spacing: .04em; text-align: center; border-radius: 3px; pointer-events: none }
 }
 @media print { .rich.over { overflow: hidden !important } }
@@ -741,12 +744,50 @@ span.uses.pool u { width: 34px; height: 12px; border-bottom-width: 1.2px }
 @media print { .tbl.spl .rich.snote.over { box-shadow: none } }
 .tbl.spl .rich.snote { display: block; font-size: calc(11.5px * var(--fs, 1)); font-weight: 500; line-height: 1.18 }
 .tbl.spl .rich.snote strong, .tbl.spl .rich.snote b { font-weight: 800 }
+.spellsbox > .splim .swap { font: 600 8px/1.1 var(--f-ui); color: #8c2129; letter-spacing: .02em; white-space: nowrap; align-self: center; max-width: 150px; overflow: hidden; text-overflow: ellipsis }
+.spellsbox > .splim.l { position: absolute }
+.spellsbox > .splim .swap { position: absolute; left: 0; top: calc(100% + 6px); max-width: 260px; background: #fff; padding: 0 3px 0 0 }
+
+/* spell row tools (screen only): insert a blank row below / remove a row */
+.tbl.spl td.pc { position: relative }
+.rowtools { position: absolute; left: -30px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; z-index: 3 }
+.tbl.spl tr:hover .rowtools { display: flex }
+.locked .rowtools { display: none !important }
+.rowtools button { width: 14px; height: 14px; padding: 0; border: 1px solid #a3a29f; border-radius: 3px; background: #fff; color: #4a4850; font: 700 11px/12px var(--f-ui); cursor: pointer }
+.rowtools button:hover { border-color: #8c2129; color: #8c2129 }
+@media print { .rowtools { display: none !important } }
+.rowtools { left: -13px; flex-direction: column; gap: 1px }
+.rowtools button { width: 12px; height: 11px; font-size: 10px; line-height: 9px; box-shadow: 0 1px 3px rgba(0,0,0,.15) }
+/* row tools stay up briefly after the pointer leaves, so they can be reached */
+.rowtools { display: flex !important; opacity: 0; visibility: hidden; transition: opacity .12s, visibility 0s linear .6s; padding: 4px 4px 4px 0 }
+.tbl.spl tr:hover .rowtools, .rowtools:hover { opacity: 1; visibility: visible; transition: opacity .12s, visibility 0s }
+.rowtools button[hidden] { display: none }
+@media print { .rowtools { display: none !important } }
+@media (prefers-reduced-motion: reduce) { .rowtools { transition: none } }
+
+/* ===== Spell rows: "+" sits on the line between rows (shows where the new row goes); "×" removes an empty row ===== */
+.rowtools { display: none !important }
+.tbl.spl td.pc { position: relative; overflow: visible }
+.rt-ins { position: absolute; left: -14px; bottom: 0; transform: translateY(50%); z-index: 4; display: flex; align-items: center; width: var(--tblw, 560px); height: 14px;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s, visibility 0s linear .6s }
+.rt-ins.top { bottom: auto; top: 0; transform: translateY(-50%) }
+.rt-ins button { pointer-events: auto; width: 13px; height: 13px; padding: 0; border: 1px solid #8c2129; border-radius: 50%; background: #fff; color: #8c2129; font: 800 11px/11px var(--f-ui); cursor: pointer; flex: none; box-shadow: 0 1px 3px rgba(0,0,0,.18) }
+.rt-ins i { flex: 1; height: 0; border-top: 2px solid #8c2129; margin-left: 2px; opacity: 0; transition: opacity .1s }
+.rt-ins:has(button:hover) i { opacity: .8 }
+.tbl.spl tr:hover .rt-ins, .rt-ins:has(button:hover) { opacity: 1; visibility: visible; transition: opacity .12s, visibility 0s }
+.rt-del { position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; padding: 0; border: 1px solid #a3a29f; border-radius: 3px; background: #fff; color: #6b6873; font: 700 11px/10px var(--f-ui); cursor: pointer; z-index: 4;
+  opacity: 0; visibility: hidden; transition: opacity .12s, visibility 0s linear .6s }
+.rt-del[hidden] { display: none }
+.tbl.spl tr:hover .rt-del, .rt-del:hover { opacity: 1; visibility: visible; transition: opacity .12s, visibility 0s }
+.rt-del:hover { border-color: #8c2129; color: #8c2129 }
+.locked .rt-ins, .locked .rt-del { display: none !important }
+@media print { .rt-ins, .rt-del { display: none !important } }
 </style>
 
 </head>
 <body>
 <header class="bar">
-  <div class="brand" title="Build 2026-10-26 22:40 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
+  <div class="brand" title="Build 2026-10-26 23:40 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
     <polygon class="d20-body" points="50,3 94,28 94,82 50,107 6,82 6,28"/>
     <polygon class="d20-face" points="50,22 82,76 18,76"/>
     <path class="d20-edge" d="M50,3 L50,22 M94,28 L82,76 M6,28 L18,76 M50,107 L18,76 M50,107 L82,76 M94,28 L50,22 M6,28 L50,22 M94,82 L82,76 M6,82 L18,76"/>
@@ -956,7 +997,7 @@ const DDBParse = (() => {
       let s = resolve(htmlToText(def.snippet), lvl);
       if (!s) {
         s = resolve(htmlToText(def.description), lvl);
-        if (s.length > 240) { const cut = s.slice(0, 240); const dot = cut.lastIndexOf('. '); s = (dot > 80 ? cut.slice(0, dot + 1) : cut.replace(/\s\S*$/, '') + '…'); }
+        if (s.length > 240) { const cut = s.slice(0, 240); const dot = cut.lastIndexOf('. '); s = (dot > 80 ? cut.slice(0, dot + 1) : cut.replace(/\s\S*$/, '') + '…'); s = s.replace(/([.!?])\s+(?:[A-Z][\w'’-]*\s?){1,3}\.$/, '$1'); }  // drop a sub-heading ("Cantrips.") caught at the cut
       }
       return s;
     };
@@ -1127,19 +1168,28 @@ const DDBParse = (() => {
       const su = usesOf(s.limitedUse);
       // ap = always prepared / free: doesn't count toward Max Prepared (leveled) or Cantrips Known (cantrips)
       const ap = !!s.alwaysPrepared || mode === 'always' || (x.level === 0 && granted);
-      const prep = x.level === 0 ? null : ap || mode === 'known' || !!s.prepared;
+      const prep = x.level === 0 ? !ap || null : ap || mode === 'known' || !!s.prepared;
       spells.push({ level: x.level, p: prep, ap, name: x.name, time: fmtTime(x.activation), range: fmtRange(x.range), c: !!x.concentration, r: !!x.ritual, m: costly, notes: notes.filter(Boolean).map(esc).join(' · ') + (su > 0 ? ' ' + usesChip({ n: su, used: s.limitedUse.numberUsed || 0, reset: resetOf(s.limitedUse) || 'LR' }) : ''), nh: 1, material: x.componentsDescription || '', desc: cleanHtml(x.description) });
     };
     (d.classSpells || []).forEach(cs => {
       const c = classes.find(k => k.id === cs.characterClassId);
       const preparer = cs.spells.some(s => s.prepared);
-      cs.spells.forEach(s => addSpell(s, classes.length > 1 && c ? c.definition.name : '', preparer ? 'flag' : 'known'));
+      // a class with no Cantrips column (e.g. Paladin's Blessed Warrior, Ranger's Druidic Warrior) gets its cantrips free
+      const rules = c && (c.definition.canCastSpells ? c.definition.spellRules : c.subclassDefinition?.spellRules);
+      const noCantripColumn = !(rules?.levelCantripsKnownMaxes?.[c?.level] > 0);
+      cs.spells.forEach(s => addSpell(s, classes.length > 1 && c ? c.definition.name : '', preparer ? 'flag' : 'known', s.definition?.level === 0 && noCantripColumn));
     });
     for (const [k, arr] of Object.entries(d.spells || {})) (arr || []).forEach(s => {
       const label = featureNames[s.componentId] || ({ race: d.race?.baseRaceName, item: 'Item', feat: 'Feat', background: 'Background' }[k] || '');
       addSpell(s, label.replace(/^Pact of the /, '').replace(/ Spells$/, '').replace(/ - .*$/, ''), s.alwaysPrepared || s.limitedUse || k !== 'class' ? 'always' : 'known', true);
     });
     spells.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+    // cantrips that can be swapped after a Long Rest (2024 Wizard; High Elf lineage cantrip)
+    const swaps = [];
+    if (classes.some(c => c.definition.name === 'Wizard')) swaps.push(classes.length > 1 ? 'Wizard: swap 1 / LR' : 'swap 1 / LR');
+    if ((d.options?.race || []).some(o => /High Elf/i.test(o.definition?.name || '')) || /High Elf/i.test(d.race?.fullName || '')) swaps.push('High Elf: swap 1 / LR');
+    const cantripSwap = swaps.join(' · ');
+
 
     // damage cantrips → attack table
     const spellAbility = (() => {
@@ -1303,7 +1353,7 @@ const DDBParse = (() => {
           });
           return parts.length > 1 ? parts.map(([nm, n]) => `${nm} ${n}`).join(' · ') : parts.length ? String(parts[0][1]) : '';
         };
-        return { prepMax: per('prep'), cantripMax: per('cantrip') };
+        return { prepMax: per('prep'), cantripMax: per('cantrip'), cantripSwap };
       })(),
       noSpells: !casters.length && !spells.length,
       attacksPerAction, armorTraining, weaponProfs: weaponProfs.join(', ') + (weaponProfs.length ? ' weapons' : '').replace(/^(Simple|Martial) weapons$/, '$1 weapons'),
@@ -1620,6 +1670,10 @@ const SheetFrames = (() => {
     if (m.attacksPerAction == null) m.attacksPerAction = 1;
     if (m.avatar == null) m.avatar = m.source?.avatar || '';
     if (m.showAvatar == null) m.showAvatar = !!m.avatar;
+    // a previous build added a blank row after the cantrips for swappers: take it back out
+    if (m.cantripSwap && !m.swapRowTrimmed) { const k = m.spells.findIndex(s => !s || String(s.level).trim() !== '0'); const s = m.spells[k]; if (s && !s.name && !String(s.level).trim() && !(s.notes || '').trim()) m.spells.splice(k, 1); m.swapRowTrimmed = true; }
+    // cantrips that count toward Cantrips Known are ticked like prepared spells
+    m.spells.forEach(s => { if (s && s.name && String(s.level).trim() === '0' && !s.ap && s.p == null) s.p = true; });
     // spell notes became rich text: convert plain notes once (keeping their star trackers)
     m.spells.forEach(s => {
       if (!s || s.nh) return;
@@ -1744,21 +1798,25 @@ const SheetFrames = (() => {
           <div class="att"><span class="cap">Magic Item Attunement</span>${[0, 1, 2].map(i => `<div class="row"><span class="dia ${M.attunement[i] ? 'on' : ''}" data-attn="${i}"></span>${t('attunement.' + i)}</div>`).join('')}</div></section>`;
   const box_coins = () => `<section class="box coins"><div class="ttl">Coins</div><div class="cg">${['cp', 'sp', 'ep', 'gp', 'pp'].map(c => `<label class="c"><span class="cap">${c.toUpperCase()}</span>${f('coins.' + c, 'trk')}</label>`).join('')}</div></section>`;
   // ---------- page 2 ----------
+  // a row may only be removed when it's completely empty and a filled row sits somewhere below it
+  const spellRowEmpty = s => !s || (!String(s.name || '').trim() && !String(s.level ?? '').trim() && !String(s.time || '').trim() && !String(s.range || '').trim() && !String(s.notes || '').replace(/<[^>]*>|&nbsp;/g, '').trim() && !s.c && !s.r && !s.m);
+  const canRemoveRow = i => spellRowEmpty(M.spells[i]) && M.spells.slice(i + 1).some(s => !spellRowEmpty(s));
+  function updateRowTools() { $$('#desk .rt-del').forEach(b => { b.hidden = !canRemoveRow(+b.dataset.row); }); }
   function spellRow(i) {
     const p = `spells.${i}`;
     const s = M.spells[i] || {};
     const isCantrip = s.name && String(s.level).trim() === '0';
     // one rule for both: a dash = always prepared (free); a star = counts toward a limit
     const prep = s.ap ? `<span class="cantrip" title="Always prepared: doesn\u2019t count toward ${isCantrip ? 'Cantrips Known' : 'Max Prepared'}">—</span>`
-      : isCantrip ? '<span class="dia ap" title="Counts toward Cantrips Known"></span>'
       : dia(p + '.p', 'Prepared').replace('class="dia"', 'class="dia trk"');
-    return `<tr><td class="pc">${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
+    return `<tr><td class="pc">${i === tableStart ? `<span class="rt-ins top noprint"><button class="rt-add" data-at="${i}" title="Insert a blank row here">+</button><i></i></span>` : ''}<span class="rt-ins noprint"><button class="rt-add" data-at="${i + 1}" title="Insert a blank row here">+</button><i></i></span><button class="rt-del noprint" data-row="${i}" title="Remove this empty row" ${canRemoveRow(i) ? '' : 'hidden'}>×</button>${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
       <td><div class="crm">${['c', 'r', 'm'].map(k => `<label>${dia(p + '.' + k, k.toUpperCase())}${k.toUpperCase()}</label>`).join('')}</div></td><td>${rich(p + '.notes', 'snote')}</td></tr>`;
   }
+  let tableStart = 0;
   const spellTable = (from, to) => {
-    let rows = ''; for (let i = from; i < to; i++) rows += spellRow(i);
+    tableStart = from; let rows = ''; for (let i = from; i < to; i++) rows += spellRow(i);
     return `<table class="tbl spl"><colgroup><col class="pc"><col class="lv"><col><col class="ct"><col class="rg"><col class="cc"><col class="nt"></colgroup>
-      <thead><tr><th class="c" title="✧ counts toward Max Prepared (tick when prepared) · ✦ cantrip that counts toward Cantrips Known · — always prepared, free. Shift-click a cell to switch a spell between free and counted.">Prep</th><th>Level</th><th>Name</th><th>Casting Time</th><th>Range</th><th>Concentration, Ritual &amp; Required Material</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <thead><tr><th class="c" title="✧ tick the spells and cantrips you have ready; tick up to your Max Prepared (spells) and Cantrips Known (cantrips) · — always prepared, free. Shift-click a cell to switch a spell between free and counted.">Prep</th><th>Level</th><th>Name</th><th>Casting Time</th><th>Range</th><th>Concentration, Ritual &amp; Required Material</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
   };
   function page2() {
     const slotCell = l => {
@@ -1779,7 +1837,7 @@ const SheetFrames = (() => {
           </section>
         </div>
         <section class="box spellsbox" style="--rh:26px"><div class="ttl">Cantrips &amp; Spells</div>
-          <label class="splim l"><span class="cap">Cantrips<br>Known</span>${t('cantripMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.cantripMax || '').length * 5 + 14))}px"`)}</label>
+          <label class="splim l"><span class="cap">Cantrips<br>Known</span>${t('cantripMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.cantripMax || '').length * 5 + 14))}px"`)}${M.cantripSwap ? `<span class="swap" title="These cantrips can be swapped after a Long Rest: cross one out and write the new one in">↻ ${esc(M.cantripSwap)}</span>` : ''}</label>
           <label class="splim r"><span class="cap">Max<br>Prepared</span>${t('prepMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.prepMax || '').length * 5 + 14))}px"`)}</label>${spellTable(0, spellCap(0))}</section>
       </div>
       <div class="right">
@@ -1923,10 +1981,12 @@ const SheetFrames = (() => {
   // ---------- fit text to boxes ----------
   function fit(el) {
     if (el.parentElement?.classList.contains('flow')) return;
-    el.classList.remove('over');
-    let s = 1; el.style.setProperty('--fs', 1);
+    el.classList.remove('over', 'one');
     const over = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
-    while (over() && s > 0.8) { s -= 0.025; el.style.setProperty('--fs', s.toFixed(2)); }
+    const shrink = () => { let s = 1; el.style.setProperty('--fs', 1); while (over() && s > 0.8) { s -= 0.025; el.style.setProperty('--fs', s.toFixed(3)); } };
+    shrink();
+    // two columns waste space on short, wide boxes (ragged column ends, the gap): try one column before giving up
+    if (over() && parseInt(getComputedStyle(el).columnCount) > 1) { el.classList.add('one'); shrink(); if (over()) { el.classList.remove('one'); shrink(); } }
     el.classList.toggle('over', over());
   }
   // wrap first; only shrink as much as needed for the wrapped text to fit the space
@@ -1960,20 +2020,32 @@ const SheetFrames = (() => {
   function balance() {
     const pair = $('.pair'), feat = $('#f-classFeaturesHtml'); if (!pair || !feat) return;
     const sp = $('#f-speciesHtml'), ft = $('#f-featsHtml');
+    // a box that can't fit at all costs far more than a slightly smaller font elsewhere
     const fsOf = el => { fit(el); return (+el.style.getPropertyValue('--fs') || 1) - (el.classList.contains('over') ? 1 : 0); };
-    let best = 262, bestR = 1, bestScore = -9;
+    const scoreOf = (...els) => { const f = els.map(fsOf); return Math.min(...f) + f.filter(x => x < 0).length * -10; };
+    let best = 262, bestR = 1, bestScore = -Infinity;
     for (const r of [1, 1.35, 1.8, 0.74]) {
       pair.style.gridTemplateColumns = `${r}fr 1fr`;
       for (let h = 200; h <= 480; h += 14) {
         pair.style.height = h + 'px';
-        const score = Math.min(fsOf(feat), fsOf(sp), fsOf(ft));
+        const score = scoreOf(feat, sp, ft);
         if (score > bestScore + 0.005) { bestScore = score; best = h; bestR = r; }
       }
     }
     pair.style.gridTemplateColumns = `${bestR}fr 1fr`;
     pair.style.height = best + 'px';
   }
+  // Measure at true print size: on screen the pages are CSS-zoomed, and zoomed measurements round
+  // differently, so a box that fits on paper could be flagged too full (or the reverse).
   function fitAll() {
+    const pages = $$('.page'), zs = pages.map(p => p.style.getPropertyValue('--z'));
+    pages.forEach(p => p.style.setProperty('--z', 1));
+    let r;
+    try { r = fitAll0(); }
+    finally { const live = $$('.page'); if (live.length === pages.length && live.every((p, i) => p === pages[i])) pages.forEach((p, i) => zs[i] ? p.style.setProperty('--z', zs[i]) : p.style.removeProperty('--z')); else zoom(); }
+    return r;
+  }
+  function fitAll0() {
     // frame classes change paddings, so apply them before measuring text
     if (typeof SheetFrames !== 'undefined') SheetFrames.decorate($('#desk'));
     balance();
@@ -1982,6 +2054,7 @@ const SheetFrames = (() => {
     $$('.rich.fit').forEach(fit);
     const n = $$('.rich.over').length;
     fitBanner();
+    $$('#desk .tbl.spl').forEach(t => t.style.setProperty('--tblw', t.offsetWidth + 14 + 'px'));
     if (repaginateSpells()) return;
     if (typeof SheetFrames !== 'undefined') SheetFrames.decorate($('#desk'));
     status(n ? `${n} box${n > 1 ? 'es are' : ' is'} too full to print completely (marked in red). Trim text or move it to Notes.` : '', !!n);
@@ -2034,6 +2107,7 @@ const SheetFrames = (() => {
       else if (el.hasAttribute('data-bool')) set(M, k, el.checked);
       else { set(M, k, el.value); if (el.classList.contains('fld')) fitField(el); }
       const sm = /^spells\.(\d+)\./.exec(k);
+      if (sm) updateRowTools();
       if (sm && el.hasAttribute('data-rich')) el.classList.remove('over');
       if (sm) {
         // filled the last row of a spell page: add the next page now
@@ -2080,6 +2154,15 @@ const SheetFrames = (() => {
         else if (star.tagName === 'I') { const i = +star.dataset.ui; c.dataset.used = used === i + 1 ? i : i + 1; }
         paintChips(rich); if (rich) set(M, rich.dataset.k, rich.innerHTML);
         refresh(); markDirty(); save(); return;
+      }
+      const rt = e.target.closest('.rt-add, .rt-del');
+      if (rt) {
+        const i = rt.classList.contains('rt-add') ? +rt.dataset.at - 1 : +rt.dataset.row;
+        const blankRow = () => ({ level: '', p: null, ap: false, name: '', time: '', range: '', c: false, r: false, m: false, notes: '', nh: 1, material: '', desc: '' });
+        while (M.spells.length < i + 1) M.spells.push(blankRow());
+        while (M.spells.length < i + 1) M.spells.push(blankRow());
+        if (rt.classList.contains('rt-add')) M.spells.splice(+rt.dataset.at, 0, blankRow()); else if (canRemoveRow(i)) M.spells.splice(i, 1); else return;
+        M.spellRefHtml = null; prepare(M); save(); render(); return;
       }
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.save) { const a = M.abilities[b.dataset.save]; a.save = !a.save; }
