@@ -2172,6 +2172,21 @@ const SheetFrames = (() => {
       else return;
       refresh(); markDirty(); save();
     });
+    // copy/cut from rich fields: write our own HTML so use-tracker chips (class + data-*) survive;
+    // the browser's default serialization drops them
+    const richCopy = (e, cut) => {
+      const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
+      const r = sel.getRangeAt(0);
+      const n = r.commonAncestorContainer, el = (n.nodeType === 1 ? n : n.parentElement)?.closest('[data-rich]');
+      if (!el) return;
+      const d = document.createElement('div'); d.append(r.cloneContents());
+      e.clipboardData.setData('text/html', d.innerHTML);
+      e.clipboardData.setData('text/plain', sel.toString());
+      e.preventDefault();
+      if (cut && el.isContentEditable) { document.execCommand('delete'); set(M, el.dataset.k, el.innerHTML); save(); fitSoon(el); }
+    };
+    desk.addEventListener('copy', e => richCopy(e, false));
+    desk.addEventListener('cut', e => richCopy(e, true));
     // paste into rich fields: keep safe formatting (bold, italics, lists, use chips), else plain text
     desk.addEventListener('paste', e => {
       const el = e.target.closest('[data-rich]'); if (!el) return;
