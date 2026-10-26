@@ -246,7 +246,6 @@ dialog::backdrop { background: rgba(10,10,14,.5) }
 
 /* ---------- print ---------- */
 @page { size: letter; margin: 0 }
-@page refp { size: letter; margin: .45in .5in }
 @media print {
   body { background: #fff }
   body::before, .bar, .toast, dialog { display: none !important }
@@ -570,7 +569,6 @@ span.uses.pool u { display: inline-block; width: 22px; border-bottom: 1px solid 
 .p2l .coins { flex: none; height: 84px }
 .p2l .equip { height: auto }
 .p2lite > h2 { margin-top: 0 }
-@page p2lite { size: letter; margin: .45in 0 }
 @media print {
   .page.flow.p2lite { page: p2lite; width: 816px !important; padding: 0 44px; background: #fff }
   .p2lite > .rich { width: auto !important }
@@ -643,6 +641,45 @@ button.dia { padding: 0 }
 .slots .sl .ds.many { gap: 0; flex-wrap: wrap; max-width: 100% }
 .slots .sl .ds.many .dia { width: 9px; height: 9px }
 .slots .sl .ds.many { flex-wrap: nowrap; gap: 0 } .slots .sl .ds.many .dia { width: 8.5px; height: 8.5px; flex: none }
+
+/* ===== Reference pages in print: margins come from the page itself, not @page,
+   so they hold up whatever the print dialog's Margins setting is.
+   box-decoration-break repeats the top/bottom padding on every printed page. ===== */
+@media print {
+  .page.flow, .page.flow.p2lite { page: auto; width: 8.5in !important; max-width: 8.5in; box-sizing: border-box;
+    padding: .45in .55in !important; -webkit-box-decoration-break: clone; box-decoration-break: clone; margin: 0 }
+  .ref > .rich, .p2lite > .rich { width: auto !important }
+}
+
+/* ===== Banner typography: name & classes lead, the rest steps down ===== */
+.divider > span { display: inline-flex; align-items: baseline; gap: 0 }
+.divider > span .bn, .divider > span .bc { font-size: 1em; font-weight: 700 }
+.divider > span .bq { font-size: .74em; font-weight: 700; color: #4a4850 }
+.divider > span .bw { font: italic 400 .86em var(--f-text); text-transform: lowercase; letter-spacing: .02em; color: #6b6873; padding: 0 .1em }
+.divider > span > * + * { margin-left: .42em }
+.divider > span .bw:first-child, .divider > span > .bw + .bw { margin-left: 0 }
+.divider > span > .bcm { margin-left: 0; padding: 0; letter-spacing: 0 }
+.divider > span > .bcm { margin-left: -.18em !important }
+/* tighter banner spacing: word gaps close to a normal space (letter-spacing already adds trailing room) */
+.divider > span > * + * { margin-left: .16em }
+.divider > span .bw { padding: 0 .05em }
+/* letter-spacing per segment, with its trailing space trimmed, so every gap between segments is the same */
+.divider > span { --ls: .22; letter-spacing: 0 !important }
+.divider > span .bn, .divider > span .bc, .divider > span .bq { letter-spacing: calc(var(--ls) * 1em); margin-right: calc(var(--ls) * -1em) }
+.divider > span > * + * { margin-left: .34em }
+.divider > span > .bcm { margin-left: 0 !important }
+.divider > span > * + * { margin-left: .26em } .divider > span > .bcm { margin-left: 0 !important }
+.divider > span > * { padding-left: 0 !important; padding-right: 0 !important } .divider > span > .bw { padding: 0 .08em !important } .divider > span > * + * { margin-left: .32em }
+.divider > span > * + * { margin-left: calc((.3 + var(--ls)) * 1em) } .divider > span > .bcm { margin-left: 0 !important }
+
+/* ===== Page numbers on reference pages (printed page number, bottom centre) ===== */
+@page ref {
+  size: letter; margin: 0 0 .38in;
+  @bottom-center { content: counter(page); font: 600 9pt "Alegreya Sans", "Gill Sans", sans-serif; color: #6b6873; vertical-align: top; padding-top: .08in }
+}
+@media print {
+  .page.flow, .page.flow.p2lite { page: ref; padding-bottom: .12in !important }
+}
 </style>
 
 </head>
@@ -1696,7 +1733,7 @@ const SheetFrames = (() => {
   function bannerCandidates() {
     const one = s => String(s || '').replace(/\s+/g, ' ').trim();
     const name = one(M.name);
-    if (!name) return ['Character Sheet'];
+    if (!name) return ['<b class="bn">Character Sheet</b>'];
     // classes come from the Class field ("Fighter 5 / Wizard 3"); subclasses from the Subclass field
     const names = one(M.className).split('/').map(c => c.replace(/\s*\d+\s*/g, ' ').trim()).filter(Boolean);
     const subsRaw = one(M.subclass).split('/').map(s => s.trim()).filter(Boolean);
@@ -1709,19 +1746,21 @@ const SheetFrames = (() => {
       return { name: n, sub: shortSub(sub) };
     });
     const sp = one(M.species);
-    const joinAll = list => list.length <= 1 ? (list[0] || '') : list.length === 2 ? `${list[0]} & ${list[1]}` : `${list.slice(0, -1).join(', ')} & ${list[list.length - 1]}`;
-    const withSub = c => (c.sub ? c.sub + ' ' : '') + c.name;
+    // typographic roles: name & classes large, species & subclass smaller, connecting words small italic
+    const N = t => `<b class="bn">${esc(t)}</b>`, C = t => `<span class="bc">${esc(t)}</span>`, Q = t => `<span class="bq">${esc(t)}</span>`, W = t => `<i class="bw">${t}</i>`;
+    const joinAll = list => list.length <= 1 ? (list[0] || '') : list.length === 2 ? `${list[0]} ${W('&amp;')} ${list[1]}` : `${list.slice(0, -1).join('<i class="bw bcm">,</i> ')} ${W('&amp;')} ${list[list.length - 1]}`;
+    const withSub = c => (c.sub ? Q(c.sub) + ' ' : '') + C(c.name);
     const [first, ...rest] = cls;
     const out = [];
-    const add = (...parts) => { const t = name + (parts.filter(Boolean).length ? ' the ' + parts.filter(Boolean).join(' ') : ''); if (!out.includes(t)) out.push(t); };
+    const add = (...parts) => { parts = parts.filter(Boolean); const t = N(name) + (parts.length ? ` ${W('the')} ` + parts.join(' ') : ''); if (!out.includes(t)) out.push(t); };
     if (first) {
-      add(sp, joinAll([withSub(first), ...rest.map(withSub)]));      // everything
-      add(joinAll([withSub(first), ...rest.map(withSub)]));          // drop species
-      if (rest.length) add(joinAll([withSub(first), ...rest.map(c => c.name)])); // drop the other classes' subclasses
-      if (rest.length) add(withSub(first));                          // drop the other classes
-      add(first.name);                                               // drop the subclass
-    } else if (sp) add(sp);
-    out.push(name);
+      add(sp && Q(sp), joinAll([withSub(first), ...rest.map(withSub)]));      // everything
+      add(joinAll([withSub(first), ...rest.map(withSub)]));                    // drop species
+      if (rest.length) add(joinAll([withSub(first), ...rest.map(c => C(c.name))])); // drop the other classes' subclasses
+      if (rest.length) add(withSub(first));                                    // drop the other classes
+      add(C(first.name));                                                      // drop the subclass
+    } else if (sp) add(Q(sp));
+    out.push(N(name));
     return out;
   }
   let lastBanner = '';
@@ -1731,14 +1770,14 @@ const SheetFrames = (() => {
     const cands = bannerCandidates();
     for (let i = 0; i < cands.length; i++) {
       const last = i === cands.length - 1;
-      dv.textContent = cands[i]; dv.style.fontSize = ''; dv.style.letterSpacing = '';
+      dv.innerHTML = cands[i]; dv.style.fontSize = ''; dv.style.removeProperty('--ls');
       let fs = parseFloat(getComputedStyle(dv).fontSize), ls = 0.22;
       const minFs = last ? 9 : 11.5;
-      while (dv.scrollWidth > lim && fs > minFs) { if (ls > 0.08) ls -= 0.03; else fs -= 0.5; dv.style.letterSpacing = ls + 'em'; dv.style.fontSize = fs + 'px'; }
+      while (dv.scrollWidth > lim && fs > minFs) { if (ls > 0.08) ls -= 0.03; else fs -= 0.5; dv.style.setProperty('--ls', ls); dv.style.fontSize = fs + 'px'; }
       if (dv.scrollWidth <= lim || last) break;
     }
-    const changed = dv.textContent + dv.style.fontSize + dv.style.letterSpacing !== lastBanner;
-    lastBanner = dv.textContent + dv.style.fontSize + dv.style.letterSpacing;
+    const sig = dv.textContent + dv.style.fontSize + dv.style.getPropertyValue('--ls');
+    const changed = sig !== lastBanner; lastBanner = sig;
     return changed;
   }
   // ---------- fit text to boxes ----------
