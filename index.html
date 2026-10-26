@@ -725,12 +725,28 @@ span.uses { gap: 3px; vertical-align: -3px; margin: 0 3px }
 span.uses i { width: 13px; height: 13px }
 span.uses em { font-size: 8px; margin-left: 3px }
 span.uses.pool u { width: 34px; height: 12px; border-bottom-width: 1.2px }
+
+/* spell notes may wrap onto up to three lines; the row grows to fit */
+.tbl.spl textarea.fld[data-k$=".notes"] { --mh: 42px }
+.tbl.spl td { height: auto; min-height: var(--rh) }
+.tbl.spl tbody tr { height: var(--rh) }
+.tbl.spl textarea.fld[data-k$=".notes"] { --mh: 56px; line-height: 1.12 }
+
+/* spell notes: rich text (trackers, bold…) that wraps and grows the row, shrinking a little past ~4 lines */
+.tbl.spl .rich.snote { font: 700 calc(12px * var(--fs, 1))/1.15 var(--f-ui); color: var(--ink); max-height: 56px; overflow: hidden; background: none; min-height: 18px; padding: 1px 1px 0; border-bottom: 1px solid #b9b5bd; display: flex; flex-direction: column; justify-content: flex-end }
+.tbl.spl .rich.snote:focus { background: rgba(29,44,85,.06) }
+.tbl.spl .rich.snote p, .tbl.spl .rich.snote div { margin: 0 }
+.tbl.spl .rich.snote span.uses i { width: 11px; height: 11px }
+.tbl.spl td:last-child { vertical-align: bottom; padding-bottom: 2px }
+@media print { .tbl.spl .rich.snote.over { box-shadow: none } }
+.tbl.spl .rich.snote { display: block; font-size: calc(11.5px * var(--fs, 1)); font-weight: 500; line-height: 1.18 }
+.tbl.spl .rich.snote strong, .tbl.spl .rich.snote b { font-weight: 800 }
 </style>
 
 </head>
 <body>
 <header class="bar">
-  <div class="brand" title="Build 2026-10-26 21:43 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
+  <div class="brand" title="Build 2026-10-26 22:40 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
     <polygon class="d20-body" points="50,3 94,28 94,82 50,107 6,82 6,28"/>
     <polygon class="d20-face" points="50,22 82,76 18,76"/>
     <path class="d20-edge" d="M50,3 L50,22 M94,28 L82,76 M6,28 L18,76 M50,107 L18,76 M50,107 L82,76 M94,28 L50,22 M6,28 L50,22 M94,82 L82,76 M6,82 L18,76"/>
@@ -1108,11 +1124,11 @@ const DDBParse = (() => {
       const costly = /gp|consume/i.test(x.componentsDescription || '');
       const notes = [comps, fmtDur(x.duration)];
       if (srcLabel) notes.push(srcLabel);
-      const su = usesOf(s.limitedUse); if (su > 0 && su <= 10) notes.push('✧'.repeat(su) + ' /' + (resetOf(s.limitedUse) || 'LR')); else if (su > 10) notes.push(`${su}/${resetOf(s.limitedUse) || 'LR'}`);
+      const su = usesOf(s.limitedUse);
       // ap = always prepared / free: doesn't count toward Max Prepared (leveled) or Cantrips Known (cantrips)
       const ap = !!s.alwaysPrepared || mode === 'always' || (x.level === 0 && granted);
       const prep = x.level === 0 ? null : ap || mode === 'known' || !!s.prepared;
-      spells.push({ level: x.level, p: prep, ap, name: x.name, time: fmtTime(x.activation), range: fmtRange(x.range), c: !!x.concentration, r: !!x.ritual, m: costly, notes: notes.filter(Boolean).join(' · '), material: x.componentsDescription || '', desc: cleanHtml(x.description) });
+      spells.push({ level: x.level, p: prep, ap, name: x.name, time: fmtTime(x.activation), range: fmtRange(x.range), c: !!x.concentration, r: !!x.ritual, m: costly, notes: notes.filter(Boolean).map(esc).join(' · ') + (su > 0 ? ' ' + usesChip({ n: su, used: s.limitedUse.numberUsed || 0, reset: resetOf(s.limitedUse) || 'LR' }) : ''), nh: 1, material: x.componentsDescription || '', desc: cleanHtml(x.description) });
     };
     (d.classSpells || []).forEach(cs => {
       const c = classes.find(k => k.id === cs.characterClassId);
@@ -1604,6 +1620,14 @@ const SheetFrames = (() => {
     if (m.attacksPerAction == null) m.attacksPerAction = 1;
     if (m.avatar == null) m.avatar = m.source?.avatar || '';
     if (m.showAvatar == null) m.showAvatar = !!m.avatar;
+    // spell notes became rich text: convert plain notes once (keeping their star trackers)
+    m.spells.forEach(s => {
+      if (!s || s.nh) return;
+      let h = esc(s.notes || '').replace(/\n/g, '<br>');
+      h = h.replace(/\s*(?:·\s*)?(✧+)\s*\/\s*([A-Za-z]+)/g, (_, st, r) => ' ' + P.usesChip({ n: st.length, used: 0, reset: r }));
+      h = h.replace(/(^|\s|·\s)(\d{2,3})\/(LR|SR|Dawn)\b/g, (_, pre, n, r) => pre + P.usesChip({ n: +n, used: 0, reset: r }));
+      s.notes = h; s.nh = 1;
+    });
     // older sheets listed only prepared spells: mark them prepared
     m.spells.forEach(s => { if (s && s.name && !('p' in s)) s.p = String(s.level).trim() === '0' ? null : true; });
     if (m.prepMax == null) m.prepMax = '';
@@ -1729,7 +1753,7 @@ const SheetFrames = (() => {
       : isCantrip ? '<span class="dia ap" title="Counts toward Cantrips Known"></span>'
       : dia(p + '.p', 'Prepared').replace('class="dia"', 'class="dia trk"');
     return `<tr><td class="pc">${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
-      <td><div class="crm">${['c', 'r', 'm'].map(k => `<label>${dia(p + '.' + k, k.toUpperCase())}${k.toUpperCase()}</label>`).join('')}</div></td><td>${t(p + '.notes')}</td></tr>`;
+      <td><div class="crm">${['c', 'r', 'm'].map(k => `<label>${dia(p + '.' + k, k.toUpperCase())}${k.toUpperCase()}</label>`).join('')}</div></td><td>${rich(p + '.notes', 'snote')}</td></tr>`;
   }
   const spellTable = (from, to) => {
     let rows = ''; for (let i = from; i < to; i++) rows += spellRow(i);
@@ -1756,7 +1780,7 @@ const SheetFrames = (() => {
         </div>
         <section class="box spellsbox" style="--rh:26px"><div class="ttl">Cantrips &amp; Spells</div>
           <label class="splim l"><span class="cap">Cantrips<br>Known</span>${t('cantripMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.cantripMax || '').length * 5 + 14))}px"`)}</label>
-          <label class="splim r"><span class="cap">Max<br>Prepared</span>${t('prepMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.prepMax || '').length * 5 + 14))}px"`)}</label>${spellTable(0, SPELL_ROWS)}</section>
+          <label class="splim r"><span class="cap">Max<br>Prepared</span>${t('prepMax', 'c').replace('<textarea', `<textarea style="width:${Math.min(130, Math.max(40, String(M.prepMax || '').length * 5 + 14))}px"`)}</label>${spellTable(0, spellCap(0))}</section>
       </div>
       <div class="right">
         ${box_appear()}
@@ -1776,16 +1800,40 @@ const SheetFrames = (() => {
       <div class="p2l-col">${box_appear()}${box_langs()}${box_coins()}</div>
     </div>${feats}</div>`;
   }
+  // spell rows per page: the defaults, reduced when tall (multi-line) rows wouldn't fit the page
+  let spellCaps = [];
+  const spellCap = i => spellCaps[i] ?? (i === 0 ? SPELL_ROWS : SPELL_ROWS_CONT);
+  const spellsUsed = () => M.spells.reduce((n, s, i) => (s && s.name ? i + 1 : n), 0);
+  // a new continuation page appears as soon as the last row of the previous page has a spell in it
   function spellCont() {
-    const used = M.spells.reduce((n, s, i) => (s && s.name ? i + 1 : n), 0);
-    if (used < SPELL_ROWS - 1) return '';
-    let out = '', from = SPELL_ROWS, k = 1;
-    while (from <= used) {
-      const to = from + SPELL_ROWS_CONT;
+    const used = spellsUsed();
+    let out = '', from = spellCap(0), k = 1;
+    while (used >= from) {
+      const to = from + spellCap(k);
       out += `<div class="page"><section class="box spellsbox" style="--rh:25px;height:100%"><div class="ttl">Cantrips &amp; Spells (continued${k > 1 ? ' ' + k : ''})</div>${spellTable(from, to)}</section></div>`;
       from = to; k++;
     }
     return out;
+  }
+  // rows that actually fit in each spell box once multi-line notes have grown their rows
+  function measureSpellCaps() {
+    const boxes = $$('#desk .spellsbox'); let changed = false; const caps = [];
+    boxes.forEach((box, i) => {
+      const rows = $$('tbody tr', box); if (!rows.length) return;
+      const r = box.getBoundingClientRect(), scale = r.height / (box.offsetHeight || 1);
+      const limit = r.bottom - (parseFloat(getComputedStyle(box).paddingBottom) || 0) * scale + 0.5;
+      let fit = 0; for (const row of rows) { if (row.getBoundingClientRect().bottom <= limit) fit++; else break; }
+      caps[i] = Math.max(1, fit);
+      if (fit < rows.length) changed = true;
+    });
+    return changed ? caps : null;
+  }
+  let repagGuard = 0, repagT = null;
+  function repaginateSpells() {
+    if (M.noSpells || repagGuard > 3) return false;
+    const caps = measureSpellCaps(); if (!caps) { repagGuard = 0; return false; }
+    caps.forEach((c, i) => { spellCaps[i] = Math.min(spellCap(i), c); });
+    repagGuard++; render(true); return true;
   }
   function refPages() {
     if (!prefs.ref) return '';
@@ -1934,14 +1982,18 @@ const SheetFrames = (() => {
     $$('.rich.fit').forEach(fit);
     const n = $$('.rich.over').length;
     fitBanner();
+    if (repaginateSpells()) return;
     if (typeof SheetFrames !== 'undefined') SheetFrames.decorate($('#desk'));
     status(n ? `${n} box${n > 1 ? 'es are' : ' is'} too full to print completely (marked in red). Trim text or move it to Notes.` : '', !!n);
   }
   let fitT; const fitSoon = el => { clearTimeout(fitT); fitT = setTimeout(() => el ? (fit(el), fitAll()) : fitAll(), 120); };
 
   // ---------- render ----------
-  function render() {
+  function render(keepCaps) {
     const desk = $('#desk');
+    if (!keepCaps) { spellCaps = []; repagGuard = 0; }
+    // re-rendering mid-edit: put the cursor back where it was
+    const ae = document.activeElement, focusId = ae && desk.contains(ae) && ae.id, selS = ae && ae.selectionStart, selE = ae && ae.selectionEnd;
     desk.innerHTML = page1() + (M.noSpells ? page2lite() : page2() + spellCont()) + refPages();
     // hide empty notes page in print
     paintChips(desk);
@@ -1956,6 +2008,7 @@ const SheetFrames = (() => {
     }
     applyLock(); refresh(); zoom();
     requestAnimationFrame(() => (document.fonts?.ready || Promise.resolve()).then(fitAll));
+    if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { if (selS != null) el.setSelectionRange(selS, selE); } catch {} } }
     renderPicker();
     $('#bSpells').setAttribute('aria-pressed', !M.noSpells);
     $('#bAvatar').setAttribute('aria-pressed', !!M.showAvatar);
@@ -1980,6 +2033,15 @@ const SheetFrames = (() => {
       if (el.hasAttribute('data-rich')) { set(M, k, el.innerHTML); fitSoon(el); }
       else if (el.hasAttribute('data-bool')) set(M, k, el.checked);
       else { set(M, k, el.value); if (el.classList.contains('fld')) fitField(el); }
+      const sm = /^spells\.(\d+)\./.exec(k);
+      if (sm && el.hasAttribute('data-rich')) el.classList.remove('over');
+      if (sm) {
+        // filled the last row of a spell page: add the next page now
+        const box = el.closest('.spellsbox'), lastRow = box && $$('tbody tr', box).pop();
+        if (lastRow && lastRow.contains(el) && (el.value ?? el.textContent).trim() && spellsUsed() >= +sm[1] + 1) { clearTimeout(repagT); render(true); return; }
+        // a note grew taller than the page allows: move rows on shortly after typing pauses
+        clearTimeout(repagT); repagT = setTimeout(() => { if (measureSpellCaps()) repaginateSpells(); }, 500);
+      }
       if (k === 'level') { const l = num(el.value); if (l >= 1 && l <= 20) { M.profBonus = Math.ceil(l / 4) + 1; const pbf = $('#f-profBonus'); if (pbf) pbf.value = M.profBonus; } }
       if (/^(attacks|spells)\.\d+\.notes$|^senses|^defenses/.test(k)) {}
       refresh(); markDirty(); save();
