@@ -1,4 +1,4 @@
-# Sheetwright — D&D 5.5e Character Sheet
+# The +1 Character Sheet — for 5.5e
 
 A single-page, browser-based character sheet for D&D 5th Edition (2024 rules), laid out like the 2024 Player's Handbook sheet. No build step and no dependencies: everything lives in `index.html`.
 
