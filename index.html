@@ -624,6 +624,18 @@ textarea.fld.wrap.namefld { --mh: 30px }
 .fr-ability .amod .tab { flex: 0 0 46px; width: 46px; padding: 5px 7px 0 2px }
 .fr-ability .amod .tab .fld { font-size: 18px; font-weight: 700 }
 .fr-ability .amod .circ b { font-size: 25px }
+
+/* ===== Death Saves: balance the column against the frame's right edge ===== */
+.vit > .vcol.ds { padding-left: 6px; padding-right: 14px }
+.vit > .vcol:first-child { padding-left: 13px }
+.vcol.ds .row { gap: 6px; justify-content: center }
+.hdr.with-portrait .vcol.ds .row { gap: 4px }
+.hdr.with-portrait .vit > .vcol.ds { padding-left: 4px; padding-right: 12px }
+.vcol.ds .row .dia { flex: none }
+button.dia { padding: 0 }
+.vcol.ds .row .dia { width: 13px; height: 13px }
+.vcol.ds .row .dia { background-size: 100% 100% !important; background-origin: border-box }
+.dia, span.uses i { background-size: 100% 100% !important; background-origin: border-box }
 </style>
 
 </head>
