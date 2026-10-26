@@ -698,12 +698,39 @@ button.dia { padding: 0 }
   .page.flow, .page.flow.p2lite { page: ref; padding-bottom: .12in !important }
 }
 .portrait .ph { font-size: 9px; line-height: 1.25; padding: 4px }
+span.uses em { cursor: pointer; border-radius: 2px; padding: 0 1px }
+span.uses em:hover { background: rgba(140,33,41,.12); color: #8c2129 }
+span.uses em.none { color: #c4c2bf; font-style: italic; text-transform: none; letter-spacing: 0 }
+@media print { span.uses em.none { display: none } }
+
+/* tracker menu in the formatting bar */
+.fmt-wrap { position: relative; display: inline-flex }
+.fmt-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 31; background: var(--bar); border: 1px solid var(--btn-line); border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.2); padding: 8px; display: flex; flex-direction: column; gap: 6px; white-space: nowrap }
+.fmt-pop[hidden] { display: none !important }
+.fmt-pop-row { display: flex; align-items: center; gap: 8px }
+.fmt-pop .lbl { font: 600 11px var(--f-ui); color: var(--desk-fg); opacity: .7; width: 44px }
+.fmt-pop .seg { display: flex; gap: 3px }
+.fmt-pop .seg button { min-width: 26px; height: 26px; font-size: 12px; border: 1px solid var(--btn-line); background: var(--btn) }
+.fmt-pop .seg button[aria-pressed="true"] { background: var(--focus); color: var(--bar); border-color: var(--focus) }
+#fmtReset button:hover { border-color: var(--focus) }
+span.uses em { cursor: default }
+span.uses.pool { cursor: text }
+span.uses.pool:hover em { color: #8c2129 }
+span.uses input.pool-n { width: 42px; font: 700 10px var(--f-ui); padding: 0 2px; margin-left: 3px; border: 1px solid #8c2129; border-radius: 3px; height: 14px }
+#fmtUses { width: 64px; height: 26px; font: 700 13px var(--f-ui); color: var(--btn-fg); background: var(--btn); border: 1px solid var(--btn-line); border-radius: 5px; padding: 0 6px }
+#fmtUses:focus { outline: 2px solid var(--focus); outline-offset: 1px }
+
+/* ===== Marker-friendly trackers: bigger stars, roomier write-in line ===== */
+span.uses { gap: 3px; vertical-align: -3px; margin: 0 3px }
+span.uses i { width: 13px; height: 13px }
+span.uses em { font-size: 8px; margin-left: 3px }
+span.uses.pool u { width: 34px; height: 12px; border-bottom-width: 1.2px }
 </style>
 
 </head>
 <body>
 <header class="bar">
-  <div class="brand" title="Build 2026-10-26 21:16 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
+  <div class="brand" title="Build 2026-10-26 21:43 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
     <polygon class="d20-body" points="50,3 94,28 94,82 50,107 6,82 6,28"/>
     <polygon class="d20-face" points="50,22 82,76 18,76"/>
     <path class="d20-edge" d="M50,3 L50,22 M94,28 L82,76 M6,28 L18,76 M50,107 L18,76 M50,107 L82,76 M94,28 L50,22 M6,28 L50,22 M94,82 L82,76 M6,82 L18,76"/>
@@ -734,7 +761,15 @@ button.dia { padding: 0 }
   <button data-cmd="insertUnorderedList" title="Bullet list">•≡</button>
   <button data-cmd="insertOrderedList" title="Numbered list">1≡</button>
   <span class="sep"></span>
-  <button data-cmd="tracker" title="Insert a use tracker (stars to tick off). Shift-click a star to add one, Alt-click to remove one.">✧✧</button>
+  <span class="fmt-wrap">
+    <button data-cmd="tracker" aria-haspopup="true" aria-expanded="false" title="Insert a use tracker (stars to tick off). Shift-click a star to add one, Alt-click to remove one.">✧✧</button>
+    <div class="fmt-pop" id="fmtPop" hidden>
+      <div class="fmt-pop-row"><span class="lbl">Uses</span>
+        <input type="number" id="fmtUses" min="1" max="999" value="2" aria-label="Number of uses"></div>
+      <div class="fmt-pop-row"><span class="lbl">Resets</span>
+        <span class="seg" id="fmtReset"><button data-r="LR">Long rest</button><button data-r="SR">Short rest</button><button data-r="Dawn">Dawn</button><button data-r="Turn">Turn</button><button data-r="">Never</button></span></div>
+    </div>
+  </span>
   <button data-cmd="removeFormat" title="Clear formatting">T<sub>×</sub></button>
 </div>
 
@@ -1961,11 +1996,24 @@ const SheetFrames = (() => {
         if (s && s.name) { s.ap = !s.ap; if (!s.ap && String(s.level).trim() !== '0' && s.p == null) s.p = true; render(); save(); toast(s.ap ? `${s.name}: always prepared` : `${s.name}: counts toward your limit`); }
         return;
       }
-      const star = e.target.closest('span.uses i, span.uses em');
+      // big pools ("___ / 25 LR"): shift/alt-click still adjust; a plain click lets you type the total
+      const pool = e.target.closest('span.uses.pool');
+      if (pool && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        const rich = pool.closest('[data-rich]'); const em = pool.querySelector('em'); if (!em || pool.querySelector('input')) return;
+        const inp = document.createElement('input'); inp.type = 'number'; inp.min = 1; inp.max = 999; inp.value = pool.dataset.n; inp.className = 'pool-n';
+        em.replaceWith(inp); inp.focus(); inp.select();
+        const done = ok => { if (inp._done) return; inp._done = true; const v = parseInt(inp.value, 10); if (ok && v > 0) pool.dataset.n = Math.min(999, v); paintChips(rich); if (rich) { set(M, rich.dataset.k, rich.innerHTML); save(); fitSoon(rich); } };
+        inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') { ev.preventDefault(); done(true); } if (ev.key === 'Escape') done(false); });
+        inp.addEventListener('blur', () => done(true));
+        inp.addEventListener('click', ev => ev.stopPropagation());
+        return;
+      }
+      const star = e.target.closest('span.uses i') || (e.shiftKey || e.altKey ? e.target.closest('span.uses.pool') : null);
       if (star) {
         const c = star.closest('span.uses'), rich = c.closest('[data-rich]');
         const n = parseInt(c.dataset.n, 10) || 0, used = parseInt(c.dataset.used, 10) || 0;
-        if (e.shiftKey) c.dataset.n = Math.min(20, n + 1);
+        if (e.shiftKey) c.dataset.n = Math.min(999, n + 1);
         else if (e.altKey) { c.dataset.n = Math.max(0, n - 1); if (+c.dataset.n === 0) c.remove(); }
         else if (star.tagName === 'I') { const i = +star.dataset.ui; c.dataset.used = used === i + 1 ? i : i + 1; }
         paintChips(rich); if (rich) set(M, rich.dataset.k, rich.innerHTML);
@@ -2118,11 +2166,26 @@ const SheetFrames = (() => {
     });
     document.addEventListener('focusout', e => {
       if (!e.target.closest?.('#desk [data-rich]')) return;
-      hideT = setTimeout(() => { if (!bar.matches(':hover')) { bar.hidden = true; cur = null; } }, 150);
+      hideT = setTimeout(() => { if (!bar.matches(':hover') && !bar.contains(document.activeElement)) { bar.hidden = true; cur = null; $('#fmtPop').hidden = true; } }, 150);
     });
     document.addEventListener('selectionchange', sync);
     window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
     bar.addEventListener('mousedown', e => e.preventDefault()); // keep the text selection
+    // tracker menu: pick how many uses, then when they come back; the second click inserts
+    let savedRange = null;
+    const closePop = () => { $('#fmtPop').hidden = true; $('#fmt [data-cmd="tracker"]').setAttribute('aria-expanded', 'false'); };
+    const usesIn = $('#fmtUses');
+    const popN = () => Math.max(1, Math.min(999, parseInt(usesIn.value, 10) || 2));
+    // the number box needs real focus; the bar's mousedown guard would block it
+    usesIn.addEventListener('mousedown', e => e.stopPropagation());
+    usesIn.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') closePop(); });
+    $('#fmtReset').addEventListener('click', e => {
+      const x = e.target.closest('button'); if (!x || !cur) return; e.stopPropagation();
+      cur.focus(); if (savedRange) { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(savedRange); }
+      document.execCommand('insertHTML', false, ' ' + P.usesChip({ n: popN(), used: 0, reset: x.dataset.r }) + '&nbsp;');
+      paintChips(cur); set(M, cur.dataset.k, cur.innerHTML); save(); fitSoon(cur); closePop();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop(); });
     bar.addEventListener('click', e => {
       const b = e.target.closest('button[data-cmd]'); if (!b || !cur) return;
       cur.focus();
@@ -2131,8 +2194,7 @@ const SheetFrames = (() => {
         const want = c === 'section' ? 'h3' : 'h4';
         document.execCommand('formatBlock', false, headTag() === want ? 'p' : want);
       } else if (c === 'tracker') {
-        document.execCommand('insertHTML', false, ' ' + P.usesChip({ n: 2, used: 0, reset: 'LR' }) + '&nbsp;');
-        paintChips(cur);
+        const pop = $('#fmtPop'); pop.hidden = !pop.hidden; const sel = getSelection(); savedRange = sel.rangeCount && cur.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null; b.setAttribute('aria-expanded', !pop.hidden); return;
       } else if (/List$/.test(c)) {
         leaveHeading(); document.execCommand(c);
       } else if (c === 'removeFormat') {
