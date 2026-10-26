@@ -703,7 +703,7 @@ button.dia { padding: 0 }
 </head>
 <body>
 <header class="bar">
-  <div class="brand"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
+  <div class="brand" title="Build 2026-10-26 21:09 UTC"><span class="the">The</span><span class="d20" role="img" aria-label="+1"><svg viewBox="0 0 100 110" aria-hidden="true">
     <polygon class="d20-body" points="50,3 94,28 94,82 50,107 6,82 6,28"/>
     <polygon class="d20-face" points="50,22 82,76 18,76"/>
     <path class="d20-edge" d="M50,3 L50,22 M94,28 L82,76 M6,28 L18,76 M50,107 L18,76 M50,107 L82,76 M94,28 L50,22 M6,28 L50,22 M94,82 L82,76 M6,82 L18,76"/>
@@ -1482,7 +1482,7 @@ const SheetFrames = (() => {
       lib = await idb.all(); useIdb = true;
       if (legacy && Object.keys(legacy).length) {   // move sheets saved by older versions over, then free localStorage
         for (const [k, v] of Object.entries(legacy)) if (!lib[k]) { lib[k] = v; await idb.put(k, v); }
-        try { localStorage.removeItem('cs.library'); } catch {}
+        try { localStorage.setItem('cs.library.migrated', localStorage.getItem('cs.library')); localStorage.removeItem('cs.library'); } catch { try { localStorage.removeItem('cs.library'); } catch {} }
       }
     } catch { useIdb = false; lib = legacy || {}; }
   }
