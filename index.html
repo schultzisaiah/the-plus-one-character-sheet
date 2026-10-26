@@ -982,7 +982,7 @@ const DDBParse = (() => {
     const fmtDur = du => !du ? '' : du.durationType === 'Instantaneous' ? 'Inst.' : du.durationType === 'Time' || du.durationType === 'Concentration' ? `${du.durationInterval} ${du.durationUnit === 'Minute' ? 'min' : du.durationUnit === 'Hour' ? 'hr' : du.durationUnit === 'Round' ? 'rnd' : (du.durationUnit || '').toLowerCase()}` : du.durationType;
     const spells = []; const spellKeys = new Set();
     // every spell the character knows; prep: true/false for leveled spells (null for cantrips), ap = always prepared
-    const addSpell = (s, srcLabel, mode) => {
+    const addSpell = (s, srcLabel, mode, granted = false) => {
       const x = s.definition; if (!x) return;
       const key = x.name + '|' + (srcLabel || '');
       if (spellKeys.has(key)) return; spellKeys.add(key);
@@ -991,9 +991,10 @@ const DDBParse = (() => {
       const notes = [comps, fmtDur(x.duration)];
       if (srcLabel) notes.push(srcLabel);
       const su = usesOf(s.limitedUse); if (su > 0 && su <= 10) notes.push('✧'.repeat(su) + ' /' + (resetOf(s.limitedUse) || 'LR')); else if (su > 10) notes.push(`${su}/${resetOf(s.limitedUse) || 'LR'}`);
-      const ap = !!s.alwaysPrepared || mode === 'always';
+      // ap = always prepared / free: doesn't count toward Max Prepared (leveled) or Cantrips Known (cantrips)
+      const ap = !!s.alwaysPrepared || mode === 'always' || (x.level === 0 && granted);
       const prep = x.level === 0 ? null : ap || mode === 'known' || !!s.prepared;
-      spells.push({ level: x.level, p: prep, ap: x.level > 0 && ap, name: x.name, time: fmtTime(x.activation), range: fmtRange(x.range), c: !!x.concentration, r: !!x.ritual, m: costly, notes: notes.filter(Boolean).join(' · '), material: x.componentsDescription || '', desc: cleanHtml(x.description) });
+      spells.push({ level: x.level, p: prep, ap, name: x.name, time: fmtTime(x.activation), range: fmtRange(x.range), c: !!x.concentration, r: !!x.ritual, m: costly, notes: notes.filter(Boolean).join(' · '), material: x.componentsDescription || '', desc: cleanHtml(x.description) });
     };
     (d.classSpells || []).forEach(cs => {
       const c = classes.find(k => k.id === cs.characterClassId);
@@ -1002,7 +1003,7 @@ const DDBParse = (() => {
     });
     for (const [k, arr] of Object.entries(d.spells || {})) (arr || []).forEach(s => {
       const label = featureNames[s.componentId] || ({ race: d.race?.baseRaceName, item: 'Item', feat: 'Feat', background: 'Background' }[k] || '');
-      addSpell(s, label.replace(/^Pact of the /, '').replace(/ Spells$/, '').replace(/ - .*$/, ''), s.alwaysPrepared || s.limitedUse || k !== 'class' ? 'always' : 'known');
+      addSpell(s, label.replace(/^Pact of the /, '').replace(/ Spells$/, '').replace(/ - .*$/, ''), s.alwaysPrepared || s.limitedUse || k !== 'class' ? 'always' : 'known', true);
     });
     spells.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 
@@ -1195,7 +1196,7 @@ const SAMPLE = {"v":1,"sample":true,"source":{"id":"sample","url":"https://www.d
 "feats":[{"name":"Shelter of the Faithful","text":"As an acolyte, you command the respect of those who share your faith, and you can perform the religious ceremonies of your deity. You and your adventuring companions can expect to receive free healing and care at a temple, shrine, or other established presence of your faith.","desc":"","subs":[],"tag":"Background"}],
 "prepMax":"2","cantripMax":"2","spellAbility":"cha","spellcastingClass":"Warlock",
 "slots":{"1":{"total":1,"expended":0,"pact":true},"2":{"total":0,"expended":0,"pact":false},"3":{"total":0,"expended":0,"pact":false},"4":{"total":0,"expended":0,"pact":false},"5":{"total":0,"expended":0,"pact":false},"6":{"total":0,"expended":0,"pact":false},"7":{"total":0,"expended":0,"pact":false},"8":{"total":0,"expended":0,"pact":false},"9":{"total":0,"expended":0,"pact":false}},
-"spells":[{"level":0,"p":null,"name":"Eldritch Blast","time":"Action","range":"120 ft","c":false,"r":false,"m":false,"notes":"V, S · Inst. · Tome","material":"","desc":""},{"level":0,"p":null,"name":"Friends","time":"Action","range":"10 ft","c":true,"r":false,"m":false,"notes":"S, M · 1 min","material":"some makeup","desc":""},{"level":0,"p":null,"name":"Mage Hand","time":"Action","range":"30 ft","c":false,"r":false,"m":false,"notes":"V, S · 1 min · Tome","material":"","desc":""},{"level":0,"p":null,"name":"Message","time":"Action","range":"120 ft","c":false,"r":false,"m":false,"notes":"S, M · 1 rnd · High Elf","material":"a copper wire","desc":""},{"level":0,"p":null,"name":"Minor Illusion","time":"Action","range":"30 ft (5-ft Cube)","c":false,"r":false,"m":false,"notes":"S, M · 1 min · Tome","material":"a bit of fleece","desc":""},{"level":0,"p":null,"name":"Poison Spray","time":"Action","range":"30 ft","c":false,"r":false,"m":false,"notes":"V, S · Inst.","material":"","desc":""},{"level":1,"p":true,"name":"Armor of Agathys","time":"Bonus","range":"Self","c":false,"r":false,"m":false,"notes":"V, S, M · 1 hr","material":"a shard of blue glass","desc":""},{"level":1,"p":true,"ap":true,"name":"Comprehend Languages","time":"Action","range":"Self","c":false,"r":true,"m":false,"notes":"V, S, M · 1 hr · Tome","material":"a pinch of soot and salt","desc":""},{"level":1,"p":true,"ap":true,"name":"Detect Magic","time":"Action","range":"Self (30-ft Sphere)","c":true,"r":true,"m":false,"notes":"V, S · 10 min · Tome","material":"","desc":""},{"level":1,"p":true,"name":"Hex","time":"Bonus","range":"90 ft","c":true,"r":false,"m":false,"notes":"V, S, M · 1 hr","material":"the petrified eye of a newt","desc":""}],
+"spells":[{"level":0,"p":null,"ap":true,"name":"Eldritch Blast","time":"Action","range":"120 ft","c":false,"r":false,"m":false,"notes":"V, S · Inst. · Tome","material":"","desc":""},{"level":0,"p":null,"name":"Friends","time":"Action","range":"10 ft","c":true,"r":false,"m":false,"notes":"S, M · 1 min","material":"some makeup","desc":""},{"level":0,"p":null,"ap":true,"name":"Mage Hand","time":"Action","range":"30 ft","c":false,"r":false,"m":false,"notes":"V, S · 1 min · Tome","material":"","desc":""},{"level":0,"p":null,"ap":true,"name":"Message","time":"Action","range":"120 ft","c":false,"r":false,"m":false,"notes":"S, M · 1 rnd · High Elf","material":"a copper wire","desc":""},{"level":0,"p":null,"ap":true,"name":"Minor Illusion","time":"Action","range":"30 ft (5-ft Cube)","c":false,"r":false,"m":false,"notes":"S, M · 1 min · Tome","material":"a bit of fleece","desc":""},{"level":0,"p":null,"name":"Poison Spray","time":"Action","range":"30 ft","c":false,"r":false,"m":false,"notes":"V, S · Inst.","material":"","desc":""},{"level":1,"p":true,"name":"Armor of Agathys","time":"Bonus","range":"Self","c":false,"r":false,"m":false,"notes":"V, S, M · 1 hr","material":"a shard of blue glass","desc":""},{"level":1,"p":true,"ap":true,"name":"Comprehend Languages","time":"Action","range":"Self","c":false,"r":true,"m":false,"notes":"V, S, M · 1 hr · Tome","material":"a pinch of soot and salt","desc":""},{"level":1,"p":true,"ap":true,"name":"Detect Magic","time":"Action","range":"Self (30-ft Sphere)","c":true,"r":true,"m":false,"notes":"V, S · 10 min · Tome","material":"","desc":""},{"level":1,"p":true,"name":"Hex","time":"Bonus","range":"90 ft","c":true,"r":false,"m":false,"notes":"V, S, M · 1 hr","material":"the petrified eye of a newt","desc":""}],
 "appearance":"","backstory":"<p><strong>Personality.</strong> I see omens in every event and action. The gods try to speak to us, we just need to listen.<br>I’ve spent so long in the temple that I have little practical experience dealing with people in the outside world.</p><p><strong>Ideals.</strong> Change. We must help bring about the changes the gods are constantly working in the world. (Chaotic)</p><p><strong>Bonds.</strong> I seek to preserve a sacred text that my enemies consider heretical and seek to destroy.</p><p><strong>Flaws.</strong> Once I pick a goal, I become obsessed with it to the detriment of everything else in my life.</p>",
 "alignment":"Chaotic Good","languages":"Common, Elvish, Dwarvish",
 "equipment":"<p><strong>Equipped:</strong> Leather, Dagger ×2, Sickle</p><p><strong>Carried:</strong> Clothes, Common, Vestments, Backpack, Book, Amulet, Orb</p><p><strong>Backpack:</strong> Oil ×10, Parchment ×10, Tinderbox, Book, Lamp, Ink Pen, Ink</p>",
@@ -1583,8 +1584,10 @@ const SheetFrames = (() => {
   function spellRow(i) {
     const p = `spells.${i}`;
     const s = M.spells[i] || {};
-    const prep = s.name && String(s.level).trim() === '0' ? '<span class="cantrip" title="Cantrips are always ready">—</span>'
-      : s.ap ? '<span class="cantrip" title="Always prepared: doesn\u2019t count toward your prepared maximum">—</span>'
+    const isCantrip = s.name && String(s.level).trim() === '0';
+    // one rule for both: a dash = always prepared (free); a star = counts toward a limit
+    const prep = s.ap ? `<span class="cantrip" title="Always prepared: doesn\u2019t count toward ${isCantrip ? 'Cantrips Known' : 'Max Prepared'}">—</span>`
+      : isCantrip ? '<span class="dia ap" title="Counts toward Cantrips Known"></span>'
       : dia(p + '.p', 'Prepared').replace('class="dia"', 'class="dia trk"');
     return `<tr><td class="pc">${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
       <td><div class="crm">${['c', 'r', 'm'].map(k => `<label>${dia(p + '.' + k, k.toUpperCase())}${k.toUpperCase()}</label>`).join('')}</div></td><td>${t(p + '.notes')}</td></tr>`;
@@ -1592,7 +1595,7 @@ const SheetFrames = (() => {
   const spellTable = (from, to) => {
     let rows = ''; for (let i = from; i < to; i++) rows += spellRow(i);
     return `<table class="tbl spl"><colgroup><col class="pc"><col class="lv"><col><col class="ct"><col class="rg"><col class="cc"><col class="nt"></colgroup>
-      <thead><tr><th class="c" title="Prepared">Prep</th><th>Level</th><th>Name</th><th>Casting Time</th><th>Range</th><th>Concentration, Ritual &amp; Required Material</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <thead><tr><th class="c" title="✧ counts toward Max Prepared (tick when prepared) · ✦ cantrip that counts toward Cantrips Known · — always prepared, free. Shift-click a cell to switch a spell between free and counted.">Prep</th><th>Level</th><th>Name</th><th>Casting Time</th><th>Range</th><th>Concentration, Ritual &amp; Required Material</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
   };
   function page2() {
     const slotCell = l => {
@@ -1834,6 +1837,15 @@ const SheetFrames = (() => {
     desk.addEventListener('change', e => { if (e.target.matches('select[data-k]')) { set(M, e.target.dataset.k, e.target.value); refresh(); save(); } });
     desk.addEventListener('click', e => {
       if (prefs.locked || !M) return;
+      // Shift-click a Prep cell to switch a spell between "always prepared" (free) and "counts toward a limit"
+      const pc = e.target.closest('.tbl.spl td.pc');
+      if (pc && e.shiftKey) {
+        e.preventDefault();
+        const row = pc.parentElement, i = [...row.parentElement.children].indexOf(row) + (row.closest('.page').id === 'pg2' ? 0 : SPELL_ROWS);
+        const k = row.querySelector('[data-k$=".level"]')?.dataset.k.split('.')[1]; const s = M.spells[k ?? i];
+        if (s && s.name) { s.ap = !s.ap; if (!s.ap && String(s.level).trim() !== '0' && s.p == null) s.p = true; render(); save(); toast(s.ap ? `${s.name}: always prepared` : `${s.name}: counts toward your limit`); }
+        return;
+      }
       const star = e.target.closest('span.uses i, span.uses em');
       if (star) {
         const c = star.closest('span.uses'), rich = c.closest('[data-rich]');
