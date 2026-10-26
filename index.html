@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sheetwright</title>
+<title>The +1 Character Sheet</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,7 +32,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
 .brand { font-family: var(--f-name); font-weight: 700; font-size: 18px; letter-spacing: .02em; margin-right: 6px; white-space: nowrap }
-.brand span { color: var(--focus) }
+.brand .plus { color: var(--bar); background: var(--accent); border-radius: 5px; padding: 0 5px 1px; margin-right: 2px; font-family: var(--f-ui); font-weight: 800; font-size: 15px; letter-spacing: 0 }
 .bar .grow { flex: 1 }
 .btn, .bar select { font: 600 14px var(--f-ui); color: var(--btn-fg); background: var(--btn); border: 1px solid var(--btn-line); border-radius: 7px; padding: 6px 12px; cursor: pointer; min-height: 34px }
 .btn:hover { border-color: var(--focus) }
@@ -259,6 +259,9 @@ dialog::backdrop { background: rgba(10,10,14,.5) }
   .fld { border-bottom-color: var(--line-soft) }
 }
 .page, .page * { font-variant-numeric: lining-nums !important }
+.brand { display: inline-flex; align-items: center; gap: 6px; line-height: 1 }
+.brand .plus { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 6px; margin: 0; line-height: 1; color: #fff; background: var(--accent); border-radius: 5px; font: 800 14px/1 var(--f-ui); letter-spacing: 0 }
+.brand .plus { height: 24px; padding: 0 7px; font-size: 17px }
 
 /* ===== Official-style frames (SVG drawn by frames.js) ===== */
 .page {
@@ -641,7 +644,7 @@ button.dia { padding: 0 }
 </head>
 <body>
 <header class="bar">
-  <div class="brand">Sheet<span>wright</span></div>
+  <div class="brand"><span class="the">The</span><span class="plus">+1</span><span>Character Sheet</span></div>
   <select id="pick" aria-label="Choose character"></select>
   <button class="btn primary" id="bImport">Import</button>
   <button class="btn" id="bExport">Export</button>
@@ -705,14 +708,14 @@ button.dia { padding: 0 }
 <dialog id="dlgExport" aria-labelledby="exT">
   <div class="dlg">
     <h2 id="exT">Export this sheet</h2>
-    <p>Save a copy of the sheet, including your edits. You can import it into Sheetwright on another computer.</p>
+    <p>Save a copy of the sheet, including your edits. You can import it into The +1 Character Sheet on another computer.</p>
     <div class="row">
       <button class="btn primary" id="bExCopy">Copy sheet JSON</button>
       <button class="btn" id="bExDl">Download .json</button>
       <span class="grow"></span>
       <button class="btn" id="bCloseEx">Close</button>
     </div>
-    <p id="printNote" hidden style="font-size:13px;opacity:.8">This hosted version can't open the print dialog or save files. To print or save a PDF, open the downloadable <code>sheetwright.html</code> file in Chrome and import this JSON there.</p>
+    <p id="printNote" hidden style="font-size:13px;opacity:.8">This hosted version can't open the print dialog or save files. To print or save a PDF, open the downloadable <code>index.html</code> file in Chrome and import this JSON there.</p>
     <textarea id="fallback" hidden readonly aria-label="Copy this text"></textarea>
   </div>
 </dialog>
@@ -1826,7 +1829,7 @@ const SheetFrames = (() => {
     renderPicker();
     $('#bSpells').setAttribute('aria-pressed', !M.noSpells);
     $('#bAvatar').setAttribute('aria-pressed', !!M.showAvatar);
-    document.title = (M.name ? M.name + ' · ' : '') + 'Sheetwright';
+    document.title = (M.name ? M.name + ' · ' : '') + 'The +1 Character Sheet';
   }
   function zoom() { const w = $('#desk').clientWidth - 32; document.documentElement.style.setProperty('--z', Math.min(1.2, w / 816).toFixed(3)); $$('.page').forEach(p => p.style.setProperty('--z', Math.min(1.2, w / 816).toFixed(3))); }
   function applyLock() {
@@ -1937,19 +1940,19 @@ const SheetFrames = (() => {
   }
   let pendingImport = null;
 
-  const BOOKMARKLET = `(async()=>{try{const m=location.pathname.match(/characters\\/(\\d+)/);if(!location.host.endsWith('dndbeyond.com')||!m){alert('Open one of your characters on dndbeyond.com first, then click this bookmark.');return}const t=await fetch('https://auth-service.dndbeyond.com/v1/cobalt-token',{method:'POST',credentials:'include'}).then(r=>r.json()).catch(()=>({}));const r=await fetch('https://character-service.dndbeyond.com/character/v5/character/'+m[1]+'?includeCustomItems=true',{headers:t.token?{Authorization:'Bearer '+t.token}:{}});if(!r.ok)throw new Error('D&D Beyond answered '+r.status+'. Are you logged in, and can you view this character?');let j=await r.text();try{const o=JSON.parse(j);const u=o.data&&o.data.decorations&&o.data.decorations.avatarUrl;if(u){const b=await fetch(u).then(x=>x.blob());const im=await createImageBitmap(b);const s=Math.min(1,320/Math.min(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);o.__avatarData=c.toDataURL('image/jpeg',.85);j=JSON.stringify(o)}}catch(e){}let ok=false;try{await navigator.clipboard.writeText(j);ok=true}catch(e){const ta=document.createElement('textarea');ta.value=j;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy')}catch(_){}ta.remove()}if(ok){alert('Character copied! Switch to Sheetwright, click Import, and paste.')}else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='ddb-character-'+m[1]+'.json';a.click();alert('Clipboard was blocked, so the character was downloaded as a .json file instead. Import that file into Sheetwright.')}}catch(e){alert('Export failed: '+e.message)}})();`;
+  const BOOKMARKLET = `(async()=>{try{const m=location.pathname.match(/characters\\/(\\d+)/);if(!location.host.endsWith('dndbeyond.com')||!m){alert('Open one of your characters on dndbeyond.com first, then click this bookmark.');return}const t=await fetch('https://auth-service.dndbeyond.com/v1/cobalt-token',{method:'POST',credentials:'include'}).then(r=>r.json()).catch(()=>({}));const r=await fetch('https://character-service.dndbeyond.com/character/v5/character/'+m[1]+'?includeCustomItems=true',{headers:t.token?{Authorization:'Bearer '+t.token}:{}});if(!r.ok)throw new Error('D&D Beyond answered '+r.status+'. Are you logged in, and can you view this character?');let j=await r.text();try{const o=JSON.parse(j);const u=o.data&&o.data.decorations&&o.data.decorations.avatarUrl;if(u){const b=await fetch(u).then(x=>x.blob());const im=await createImageBitmap(b);const s=Math.min(1,320/Math.min(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);o.__avatarData=c.toDataURL('image/jpeg',.85);j=JSON.stringify(o)}}catch(e){}let ok=false;try{await navigator.clipboard.writeText(j);ok=true}catch(e){const ta=document.createElement('textarea');ta.value=j;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy')}catch(_){}ta.remove()}if(ok){alert('Character copied! Switch to The +1 Character Sheet, click Import, and paste.')}else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='ddb-character-'+m[1]+'.json';a.click();alert('Clipboard was blocked, so the character was downloaded as a .json file instead. Import that file into The +1 Character Sheet.')}}catch(e){alert('Export failed: '+e.message)}})();`;
   const USERSCRIPT = `// ==UserScript==
-// @name         Sheetwright: copy D&D Beyond character
-// @namespace    sheetwright
-// @version      1.1
-// @description  Adds a "Copy for Sheetwright" button to D&D Beyond character pages.
+// @name         The +1 Character Sheet: copy D&D Beyond character
+// @namespace    plus-one-character-sheet
+// @version      1.2
+// @description  Adds a "Copy for +1 Sheet" button to D&D Beyond character pages.
 // @match        https://www.dndbeyond.com/characters/*
 // @match        https://www.dndbeyond.com/profile/*/characters/*
 // @grant        GM_setClipboard
 // ==/UserScript==
 (function () {
   const btn = document.createElement('button');
-  btn.textContent = 'Copy for Sheetwright';
+  btn.textContent = 'Copy for +1 Sheet';
   Object.assign(btn.style, { position: 'fixed', right: '16px', bottom: '16px', zIndex: 99999, padding: '10px 16px', background: '#8c2129', color: '#fff', border: 0, borderRadius: '999px', font: '600 14px sans-serif', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0,0,0,.3)' });
   btn.onclick = async () => {
     const m = location.pathname.match(/characters\\/(\\d+)/); if (!m) return;
@@ -1959,14 +1962,14 @@ const SheetFrames = (() => {
       const r = await fetch('https://character-service.dndbeyond.com/character/v5/character/' + m[1] + '?includeCustomItems=true', { headers: t.token ? { Authorization: 'Bearer ' + t.token } : {} });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       let j = await r.text();
-      try { // include the portrait, shrunk, so Sheetwright can show it
+      try { // include the portrait, shrunk, so the sheet can show it
         const o = JSON.parse(j); const u = o.data && o.data.decorations && o.data.decorations.avatarUrl;
         if (u) { const im = await createImageBitmap(await fetch(u).then(x => x.blob())); const s = Math.min(1, 320 / Math.min(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); o.__avatarData = c.toDataURL('image/jpeg', .85); j = JSON.stringify(o); }
       } catch (e) {}
       GM_setClipboard(j, 'text');
-      btn.textContent = 'Copied! Paste into Sheetwright';
+      btn.textContent = 'Copied! Paste into the +1 Sheet';
     } catch (e) { btn.textContent = 'Failed: ' + e.message; }
-    setTimeout(() => (btn.textContent = 'Copy for Sheetwright'), 4000);
+    setTimeout(() => (btn.textContent = 'Copy for +1 Sheet'), 4000);
   };
   document.body.appendChild(btn);
 })();`;
