@@ -58,6 +58,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .ttl { font: 700 13px/1 var(--f-label); letter-spacing: .06em; text-align: center; color: var(--label); padding: 3px 0 5px; border-bottom: 1.2px solid var(--line); margin-bottom: 5px; text-transform: uppercase; font-size: 12px }
 .cap { font: 600 9.5px/1 var(--f-label); letter-spacing: .09em; text-transform: uppercase; color: var(--label) }
 .gridbg { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 11px 11px }
+/* print: the tiled, semi-transparent grid above makes Chrome flatten each grid box into a 72-dpi bitmap,
+   which printers smear into thick grey bands. One untiled repeating gradient in a solid colour stays vector:
+   crisp hairlines, a quarter of a pixel wide. */
+@media print { .gridbg { background-image: repeating-linear-gradient(#cfccd2 0 .25px, transparent .25px 11px), repeating-linear-gradient(90deg, #cfccd2 0 .25px, transparent .25px 11px); background-size: auto } }
 
 /* inputs look like handwriting on lines */
 .fld { font-variant-numeric: lining-nums; font: 600 15px/1.15 var(--f-ui); color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line-soft); width: 100%; padding: 1px 2px; min-width: 0; border-radius: 0 }
