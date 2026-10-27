@@ -13,7 +13,7 @@
   --desk: #d8d6d2; --desk-fg: #23222a; --bar: #f4f3f0; --bar-line: #c9c6c0; --btn: #ffffff; --btn-fg: #23222a; --btn-line: #bdb9b2;
   --focus: #7a1f24;
   /* paper (always light: it's a printed sheet) */
-  --paper: #fbfaf7; --paper-2: #f1efea; --line: #6b6873; --line-soft: #b9b5bd; --label: #3a3840; --ink: #1d2c55; --ink-soft: #4b5a80; --accent: #8c2129; --grid: rgba(107,104,115,.10);
+  --paper: #fbfaf7; --paper-2: #f1efea; --line: #6b6873; --line-soft: #b9b5bd; --label: #3a3840; --ink: #1d2c55; --ink-soft: #4b5a80; --accent: #8c2129;
   --f-label: "Alegreya Sans SC", "Gill Sans", "Trebuchet MS", sans-serif;
   --f-ui: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
   --f-text: "Alegreya", Georgia, "Times New Roman", serif;
@@ -57,11 +57,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .box.plain::before, .box.plain::after { display: none }
 .ttl { font: 700 13px/1 var(--f-label); letter-spacing: .06em; text-align: center; color: var(--label); padding: 3px 0 5px; border-bottom: 1.2px solid var(--line); margin-bottom: 5px; text-transform: uppercase; font-size: 12px }
 .cap { font: 600 9.5px/1 var(--f-label); letter-spacing: .09em; text-transform: uppercase; color: var(--label) }
-.gridbg { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 11px 11px }
-/* print: the tiled, semi-transparent grid above makes Chrome flatten each grid box into a 72-dpi bitmap,
-   which printers smear into thick grey bands. One untiled repeating gradient in a solid colour stays vector:
-   crisp hairlines, a quarter of a pixel wide. */
-@media print { .gridbg { background-image: repeating-linear-gradient(#cfccd2 0 .25px, transparent .25px 11px), repeating-linear-gradient(90deg, #cfccd2 0 .25px, transparent .25px 11px); background-size: auto } }
 
 /* inputs look like handwriting on lines */
 .fld { font-variant-numeric: lining-nums; font: 600 15px/1.15 var(--f-ui); color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line-soft); width: 100%; padding: 1px 2px; min-width: 0; border-radius: 0 }
@@ -299,7 +294,7 @@ svg.frame { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
 /* titles: bold caps with a black rule, like the printed sheet */
 .ttl { color: #1c1c1c; font-weight: 700; border-bottom: 1.3px solid #1c1c1c; letter-spacing: .05em }
 .box { padding: 9px 12px 10px }
-.fr-panel .rich.gridbg { background-color: #fff }
+.fr-panel .rich.notebg { background-color: #fff }
 
 /* ability blocks */
 .abl.framed { padding: 7px 13px 9px }
@@ -1779,10 +1774,10 @@ const SheetFrames = (() => {
         <section class="box weapons" style="--rh:${rh}px"><div class="ttl">Weapons &amp; Damage Cantrips</div>
                     <table class="tbl atk"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col></colgroup>
           <thead><tr><th>Attack</th><th>Range</th><th class="c">Hit / DC</th><th>Damage</th><th class="nth"><div class="thf"><span>Notes</span><label class="apa"><span class="cap">Attacks / Action</span>${f('attacksPerAction', 'c')}</label></div></th></tr></thead><tbody>${atkRows}</tbody></table></section>
-        <section class="box features"><div class="ttl">Class Features</div>${rich('classFeaturesHtml', 'gridbg', 'Class features…')}</section>
+        <section class="box features"><div class="ttl">Class Features</div>${rich('classFeaturesHtml', 'notebg', 'Class features…')}</section>
         <div class="pair">
-          <section class="box"><div class="ttl">Species Traits</div>${rich('speciesHtml', 'gridbg', 'Species traits…')}</section>
-          <section class="box"><div class="ttl">Feats</div>${rich('featsHtml', 'gridbg', 'Feats…')}</section>
+          <section class="box"><div class="ttl">Species Traits</div>${rich('speciesHtml', 'notebg', 'Species traits…')}</section>
+          <section class="box"><div class="ttl">Feats</div>${rich('featsHtml', 'notebg', 'Feats…')}</section>
         </div>
       </div>
       <section class="box training"><div class="ttl">Equipment Training &amp; Proficiencies</div>
@@ -1794,11 +1789,11 @@ const SheetFrames = (() => {
   }
 
   // shared page-2 boxes (also used by the no-spellcasting layout)
-  const box_appear = () => `<section class="box appear"><div class="ttl">Appearance</div>${rich('appearance', 'fill gridbg', 'Looks, clothing, mannerisms…')}</section>`;
-  const box_back = () => `<section class="box backstory"><div class="ttl">Backstory &amp; Personality</div>${rich('backstory', 'fill gridbg')}
+  const box_appear = () => `<section class="box appear"><div class="ttl">Appearance</div>${rich('appearance', 'fill notebg', 'Looks, clothing, mannerisms…')}</section>`;
+  const box_back = () => `<section class="box backstory"><div class="ttl">Backstory &amp; Personality</div>${rich('backstory', 'fill notebg')}
           <label class="align"><span class="cap">Alignment</span>${t('alignment')}</label></section>`;
   const box_langs = () => `<section class="box langs"><div class="ttl">Languages</div>${rich('languagesHtml', 'fill')}</section>`;
-  const box_equip = () => `<section class="box equip"><div class="ttl">Equipment</div>${rich('equipment', 'fill gridbg')}
+  const box_equip = () => `<section class="box equip"><div class="ttl">Equipment</div>${rich('equipment', 'fill notebg')}
           <div class="att"><span class="cap">Magic Item Attunement</span>${[0, 1, 2].map(i => `<div class="row"><span class="dia ${M.attunement[i] ? 'on' : ''}" data-attn="${i}"></span>${t('attunement.' + i)}</div>`).join('')}</div></section>`;
   const box_coins = () => `<section class="box coins"><div class="ttl">Coins</div><div class="cg">${['cp', 'sp', 'ep', 'gp', 'pp'].map(c => `<label class="c"><span class="cap">${c.toUpperCase()}</span>${f('coins.' + c, 'trk')}</label>`).join('')}</div></section>`;
   // ---------- page 2 ----------
