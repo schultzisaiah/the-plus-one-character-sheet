@@ -539,6 +539,7 @@ span.uses.pool u { display: inline-block; width: 22px; border-bottom: 1px solid 
 .tbl th .apa .fld { width: 18px; height: 14px; font-size: 11px; font-weight: 800; padding: 0; border-bottom: 1px solid #8d8c8a; text-align: center }
 
 /* ===== Spells: prepared column ===== */
+body.prep-only .tbl.spl tr.named:has(input.dia[data-k$=".p"]:not(:checked)) > td:not(.pc) { opacity: .4; }
 .spellsbox .tbl col.pc { width: 26px }
 .spellsbox .tbl col.nt { width: 140px }
 .tbl.spl td.pc { text-align: center; padding: 0 }
@@ -799,6 +800,7 @@ span.uses.pool u { width: 34px; height: 12px; border-bottom-width: 1.2px }
   <button class="btn" id="bAvatar" aria-pressed="false" title="Show or hide the character portrait in the header. Drag the picture to reposition it; click it to choose a different one.">Portrait</button>
   <button class="btn" id="bTrk" aria-pressed="true" title="Print current HP, temp HP, spent hit dice, death saves, inspiration, used spell slots, coins and XP as blanks, ready for pencil or dry-erase. Values that won't print show in light grey.">Blank trackers</button>
   <button class="btn" id="bSpells" aria-pressed="true" title="Show or hide the spellcasting page for this character. When hidden, Features & Traits starts on page 2.">Spellcasting</button>
+  <button class="btn" id="bUnprep" aria-pressed="true" title="Print every spell on your list, or only the ones you've prepared (plus always-prepared spells). With it off, unprepared spells fade on screen to show they won't print.">Unprepared spells</button>
   <button class="btn" id="bRef" aria-pressed="true" title="Add full-text Features, Spell and Notes pages after the sheet">Reference pages</button>
   <button class="btn" id="bDelete" hidden>Delete</button>
   <span class="grow"></span>
@@ -1182,6 +1184,17 @@ const DDBParse = (() => {
       const label = featureNames[s.componentId] || ({ race: d.race?.baseRaceName, item: 'Item', feat: 'Feat', background: 'Background' }[k] || '');
       addSpell(s, label.replace(/^Pact of the /, '').replace(/ Spells$/, '').replace(/ - .*$/, ''), s.alwaysPrepared || s.limitedUse || k !== 'class' ? 'always' : 'known', true);
     });
+    // the rest of the class list (Cleric, Druid, Paladin, Ranger, Artificer), added unprepared so the
+    // daily picks are just a Prep click; spells already on the sheet from any source keep their row
+    const haveNames = new Set(spells.map(s => s.name));
+    for (const [ccid, list] of Object.entries(raw.__classSpellOptions || {})) {
+      const c = classes.find(k => String(k.id) === String(ccid)); if (!c) continue;
+      (list || []).forEach(s => {
+        if (!s?.definition?.name || !(s.definition.level > 0) || haveNames.has(s.definition.name)) return;
+        haveNames.add(s.definition.name);
+        addSpell({ definition: s.definition }, classes.length > 1 ? c.definition.name : '', 'flag');
+      });
+    }
     spells.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
     // cantrips that can be swapped after a Long Rest (2024 Wizard; High Elf lineage cantrip)
     const swaps = [];
@@ -1599,7 +1612,26 @@ const SheetFrames = (() => {
   let prefs = Object.assign({ ref: true }, store.get('cs.prefs', {}));
   let M = null;
   let saveT = null;
-  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { if (!M || M.sample) return; lib[curId] = M; persist(curId); }, 250); };
+  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { if (!M || M.sample) return; if (printView) { saveAfterPrint = true; return; } lib[curId] = M; persist(curId); }, 250); };
+  // while printing prepared spells only, M.spells briefly holds the filtered list; the real one waits here
+  let printView = null, saveAfterPrint = false;
+  const unprepared = s => !!(s && s.name && !s.ap && s.p === false);
+  function startPrepOnlyPrint() {
+    if (printView || !M || M.noSpells || prefs.unprep !== false || !M.spells.some(unprepared)) return;
+    printView = { spells: M.spells, names: new Set(M.spells.filter(unprepared).map(s => s.name)) };
+    M.spells = M.spells.filter(s => !unprepared(s));
+    render(); for (let k = 0; k < 6; k++) fitAll(); // paginate now: the print snapshot is taken right after this
+    // and drop their write-ups from the Spell Reference page
+    $$('#desk .page.ref').filter(pg => /Spell Reference/.test(pg.querySelector('h2')?.textContent || '')).forEach(pg => {
+      const box = pg.querySelector('.rich'); if (!box) return; let skip = false;
+      [...box.children].forEach(el => { if (el.tagName === 'H4') skip = printView.names.has(el.textContent.trim()); if (skip) el.style.display = 'none'; });
+    });
+  }
+  function endPrepOnlyPrint() {
+    if (!printView) return;
+    M.spells = printView.spells; printView = null; render();
+    if (saveAfterPrint) { saveAfterPrint = false; save(); }
+  }
 
   // ---------- sanitize (for pasted/imported html) ----------
   function sanitize(html) {
@@ -1808,7 +1840,7 @@ const SheetFrames = (() => {
     // one rule for both: a dash = always prepared (free); a star = counts toward a limit
     const prep = s.ap ? `<span class="cantrip" title="Always prepared: doesn\u2019t count toward ${isCantrip ? 'Cantrips Known' : 'Max Prepared'}">—</span>`
       : dia(p + '.p', 'Prepared').replace('class="dia"', 'class="dia trk"');
-    return `<tr><td class="pc">${i === tableStart ? `<span class="rt-ins top noprint"><button class="rt-add" data-at="${i}" title="Insert a blank row here">+</button><i></i></span>` : ''}<span class="rt-ins noprint"><button class="rt-add" data-at="${i + 1}" title="Insert a blank row here">+</button><i></i></span><button class="rt-del noprint" data-row="${i}" title="Remove this empty row" ${canRemoveRow(i) ? '' : 'hidden'}>×</button>${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
+    return `<tr${s.name ? ' class="named"' : ''}><td class="pc">${i === tableStart ? `<span class="rt-ins top noprint"><button class="rt-add" data-at="${i}" title="Insert a blank row here">+</button><i></i></span>` : ''}<span class="rt-ins noprint"><button class="rt-add" data-at="${i + 1}" title="Insert a blank row here">+</button><i></i></span><button class="rt-del noprint" data-row="${i}" title="Remove this empty row" ${canRemoveRow(i) ? '' : 'hidden'}>×</button>${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
       <td><div class="crm">${['c', 'r', 'm'].map(k => `<label>${dia(p + '.' + k, k.toUpperCase())}${k.toUpperCase()}</label>`).join('')}</div></td><td>${rich(p + '.notes', 'snote')}</td></tr>`;
   }
   let tableStart = 0;
@@ -2205,6 +2237,8 @@ const SheetFrames = (() => {
     });
     desk.addEventListener('focusout', e => { const el = e.target.closest('[data-rich]'); if (el) { if (convertChipShorthand(el)) { set(M, el.dataset.k, el.innerHTML); save(); } fitSoon(el); } });
     window.addEventListener('resize', zoom);
+    window.addEventListener('beforeprint', startPrepOnlyPrint);
+    window.addEventListener('afterprint', endPrepOnlyPrint);
     window.addEventListener('beforeprint', () => { $$('.rich.over').forEach(r => { r.scrollTop = 0; }); $$('.page').forEach(p => p.style.setProperty('--z', 1)); });
     window.addEventListener('afterprint', zoom);
   }
@@ -2251,11 +2285,11 @@ const SheetFrames = (() => {
   }
   let pendingImport = null;
 
-  const BOOKMARKLET = `(async()=>{try{const m=location.pathname.match(/characters\\/(\\d+)/);if(!location.host.endsWith('dndbeyond.com')||!m){alert('Open one of your characters on dndbeyond.com first, then click this bookmark.');return}const t=await fetch('https://auth-service.dndbeyond.com/v1/cobalt-token',{method:'POST',credentials:'include'}).then(r=>r.json()).catch(()=>({}));const r=await fetch('https://character-service.dndbeyond.com/character/v5/character/'+m[1]+'?includeCustomItems=true',{headers:t.token?{Authorization:'Bearer '+t.token}:{}});if(!r.ok)throw new Error('D&D Beyond answered '+r.status+'. Are you logged in, and can you view this character?');let j=await r.text();try{const o=JSON.parse(j);const u=o.data&&o.data.decorations&&o.data.decorations.avatarUrl;if(u){const b=await fetch(u).then(x=>x.blob());const im=await createImageBitmap(b);const s=Math.min(1,320/Math.min(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);o.__avatarData=c.toDataURL('image/jpeg',.85);j=JSON.stringify(o)}}catch(e){}let ok=false;try{await navigator.clipboard.writeText(j);ok=true}catch(e){const ta=document.createElement('textarea');ta.value=j;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy')}catch(_){}ta.remove()}if(ok){alert('Character copied! Switch to The +1 Character Sheet, click Import, and paste.')}else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='ddb-character-'+m[1]+'.json';a.click();alert('Clipboard was blocked, so the character was downloaded as a .json file instead. Import that file into The +1 Character Sheet.')}}catch(e){alert('Export failed: '+e.message)}})();`;
+  const BOOKMARKLET = `(async()=>{try{const m=location.pathname.match(/characters\\/(\\d+)/);if(!location.host.endsWith('dndbeyond.com')||!m){alert('Open one of your characters on dndbeyond.com first, then click this bookmark.');return}const t=await fetch('https://auth-service.dndbeyond.com/v1/cobalt-token',{method:'POST',credentials:'include'}).then(r=>r.json()).catch(()=>({}));const r=await fetch('https://character-service.dndbeyond.com/character/v5/character/'+m[1]+'?includeCustomItems=true',{headers:t.token?{Authorization:'Bearer '+t.token}:{}});if(!r.ok)throw new Error('D&D Beyond answered '+r.status+'. Are you logged in, and can you view this character?');let j=await r.text();try{const o=JSON.parse(j);try{const u=o.data&&o.data.decorations&&o.data.decorations.avatarUrl;if(u){const b=await fetch(u).then(x=>x.blob());const im=await createImageBitmap(b);const s=Math.min(1,320/Math.min(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);o.__avatarData=c.toDataURL('image/jpeg',.85)}}catch(e){}try{const P=['Cleric','Druid','Paladin','Ranger','Artificer'];for(const k of (o.data&&o.data.classes)||[]){if(!k.definition||P.indexOf(k.definition.name)<0)continue;try{const q=await fetch('https://character-service.dndbeyond.com/character/v5/game-data/spells?classId='+k.definition.id+'&classLevel='+k.level+'&sharingSetting=2',{headers:t.token?{Authorization:'Bearer '+t.token}:{}}).then(x=>x.json());if(q&&Array.isArray(q.data))(o.__classSpellOptions=o.__classSpellOptions||{})[k.id]=q.data.filter(s=>s.definition&&s.definition.level>0).map(s=>{const x=s.definition;return{definition:{name:x.name,level:x.level,activation:x.activation,range:x.range,concentration:x.concentration,ritual:x.ritual,components:x.components,componentsDescription:x.componentsDescription,duration:x.duration,description:x.description}}})}catch(e){}}}catch(e){}j=JSON.stringify(o)}catch(e){}let ok=false;try{await navigator.clipboard.writeText(j);ok=true}catch(e){const ta=document.createElement('textarea');ta.value=j;document.body.appendChild(ta);ta.select();try{ok=document.execCommand('copy')}catch(_){}ta.remove()}if(ok){alert('Character copied! Switch to The +1 Character Sheet, click Import, and paste.')}else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='ddb-character-'+m[1]+'.json';a.click();alert('Clipboard was blocked, so the character was downloaded as a .json file instead. Import that file into The +1 Character Sheet.')}}catch(e){alert('Export failed: '+e.message)}})();`;
   const USERSCRIPT = `// ==UserScript==
 // @name         The +1 Character Sheet: copy D&D Beyond character
 // @namespace    plus-one-character-sheet
-// @version      1.2
+// @version      1.3
 // @description  Adds a "Copy for +1 Sheet" button to D&D Beyond character pages.
 // @match        https://www.dndbeyond.com/characters/*
 // @match        https://www.dndbeyond.com/profile/*/characters/*
@@ -2273,9 +2307,16 @@ const SheetFrames = (() => {
       const r = await fetch('https://character-service.dndbeyond.com/character/v5/character/' + m[1] + '?includeCustomItems=true', { headers: t.token ? { Authorization: 'Bearer ' + t.token } : {} });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       let j = await r.text();
-      try { // include the portrait, shrunk, so the sheet can show it
-        const o = JSON.parse(j); const u = o.data && o.data.decorations && o.data.decorations.avatarUrl;
-        if (u) { const im = await createImageBitmap(await fetch(u).then(x => x.blob())); const s = Math.min(1, 320 / Math.min(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); o.__avatarData = c.toDataURL('image/jpeg', .85); j = JSON.stringify(o); }
+      try {
+        const o = JSON.parse(j);
+        try { // include the portrait, shrunk, so the sheet can show it
+          const u = o.data && o.data.decorations && o.data.decorations.avatarUrl;
+          if (u) { const im = await createImageBitmap(await fetch(u).then(x => x.blob())); const s = Math.min(1, 320 / Math.min(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); o.__avatarData = c.toDataURL('image/jpeg', .85); }
+        } catch (e) {}
+        try { // classes that prepare from their whole list: include every spell they could prepare
+          const P=['Cleric','Druid','Paladin','Ranger','Artificer'];for(const k of (o.data&&o.data.classes)||[]){if(!k.definition||P.indexOf(k.definition.name)<0)continue;try{const q=await fetch('https://character-service.dndbeyond.com/character/v5/game-data/spells?classId='+k.definition.id+'&classLevel='+k.level+'&sharingSetting=2',{headers:t.token?{Authorization:'Bearer '+t.token}:{}}).then(x=>x.json());if(q&&Array.isArray(q.data))(o.__classSpellOptions=o.__classSpellOptions||{})[k.id]=q.data.filter(s=>s.definition&&s.definition.level>0).map(s=>{const x=s.definition;return{definition:{name:x.name,level:x.level,activation:x.activation,range:x.range,concentration:x.concentration,ritual:x.ritual,components:x.components,componentsDescription:x.componentsDescription,duration:x.duration,description:x.description}}})}catch(e){}}
+        } catch (e) {}
+        j = JSON.stringify(o);
       } catch (e) {}
       GM_setClipboard(j, 'text');
       btn.textContent = 'Copied! Paste into the +1 Sheet';
@@ -2428,6 +2469,9 @@ const SheetFrames = (() => {
     const syncTrk = () => { document.body.classList.toggle('trk-blank', prefs.trk !== false); $('#bTrk').setAttribute('aria-pressed', prefs.trk !== false); };
     syncTrk();
     $('#bTrk').onclick = () => { prefs.trk = prefs.trk === false; store.set('cs.prefs', prefs); syncTrk(); toast(prefs.trk ? 'Trackers will print blank' : 'Trackers will print with current values'); };
+    const syncUnprep = () => { document.body.classList.toggle('prep-only', prefs.unprep === false); $('#bUnprep').setAttribute('aria-pressed', prefs.unprep !== false); };
+    syncUnprep();
+    $('#bUnprep').onclick = () => { prefs.unprep = prefs.unprep === false; store.set('cs.prefs', prefs); syncUnprep(); toast(prefs.unprep ? 'All spells will print' : 'Only prepared spells will print'); };
     $('#bRef').onclick = () => { prefs.ref = !prefs.ref; store.set('cs.prefs', prefs); $('#bRef').setAttribute('aria-pressed', prefs.ref); render(); };
     $('#pick').onchange = e => open(e.target.value);
     $('#bDelete').onclick = () => { $('#delName').textContent = M.name || 'this sheet'; $('#dlgDelete').showModal(); };
