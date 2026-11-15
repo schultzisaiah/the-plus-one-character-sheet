@@ -32,7 +32,7 @@ flowchart LR
 2. Click the bookmark.
 3. Come back and paste into the Import box.
 
-**Clerics, Druids, Paladins, Rangers and Artificers** get their whole class spell list (every level they can cast), not just the spells they've prepared. The rest come in unprepared, so changing your spells after a Long Rest is just a click on each Prep star. (If you set up the bookmark before this was added, drag it to your bookmarks bar again to get the new version.)
+**Spellcasters get their whole class spell list**, the same list as D&D Beyond's Manage Spells, not just the spells they've chosen. The extra spells and cantrips come in unchecked, so changing your spells is just a click on each Prep star. (If you set up the bookmark before this was added, drag it to your bookmarks bar again to get the new version.)
 
 Leveled up? Import again. It asks before replacing the existing sheet, and replacing it overwrites any edits you made to that character here.
 
