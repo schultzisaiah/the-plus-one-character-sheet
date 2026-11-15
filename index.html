@@ -1743,9 +1743,9 @@ const SheetFrames = (() => {
     ['classFeaturesHtml', 'speciesHtml', 'featsHtml', 'weaponsHtml', 'toolsHtml', 'languagesHtml', 'refHtml', 'spellRefHtml', 'equipment', 'backstory', 'appearance', 'extraNotes'].forEach(k => { if (typeof m[k] === 'string') m[k] = sanitize(m[k]); });
     return m;
   }
-  const blank = () => prepare({ v: 1, source: {}, name: '', background: '', className: '', subclass: '', species: '', level: 1, xp: '', ac: 10, shield: false, hp: { max: '', current: '', temp: '' }, hitDice: { max: '', spent: '' }, deathSaves: { s: 0, f: 0 }, profBonus: 2,
-    abilities: Object.fromEntries(AB.map(a => [a, { score: 10, save: false, saveBonus: 0 }])), skills: Object.fromEntries(Object.keys(SK).map(k => [k, { prof: 0, bonus: 0 }])),
-    initBonus: 0, speed: '30 ft.', size: 'Medium', ppBonus: 0, senses: '', defenses: '', heroicInspiration: false, armorTraining: {}, spellAbility: 'int', classFeatures: [], speciesTraits: [], feats: [], appearance: '', backstory: '', alignment: '', equipment: '' });
+  const blank = () => prepare({ v: 1, source: {}, name: '', background: '', className: '', subclass: '', species: '', level: '', xp: '', ac: '', shield: false, hp: { max: '', current: '', temp: '' }, hitDice: { max: '', spent: '' }, deathSaves: { s: 0, f: 0 }, profBonus: '',
+    abilities: Object.fromEntries(AB.map(a => [a, { score: '', save: false, saveBonus: 0 }])), skills: Object.fromEntries(Object.keys(SK).map(k => [k, { prof: 0, bonus: 0 }])),
+    initBonus: 0, speed: '', size: '', ppBonus: 0, senses: '', defenses: '', heroicInspiration: false, armorTraining: {}, spellAbility: '', attacksPerAction: '', classFeatures: [], speciesTraits: [], feats: [], appearance: '', backstory: '', alignment: '', equipment: '' });
 
   // ---------- field builders ----------
   const id = p => 'f-' + p.replace(/\./g, '-');
@@ -1873,7 +1873,7 @@ const SheetFrames = (() => {
       <div class="left">
         <div class="sctop">
           <section class="box scbox plain">
-            <label class="abil"><span class="cap">Spellcasting Ability</span><select id="f-spellAbility" data-k="spellAbility">${AB.map(a => `<option value="${a}" ${M.spellAbility === a ? 'selected' : ''}>${AB_LABEL[a]}</option>`).join('')}</select></label>
+            <label class="abil"><span class="cap">Spellcasting Ability</span><select id="f-spellAbility" data-k="spellAbility">${M.spellAbility ? '' : '<option value="" selected></option>'}${AB.map(a => `<option value="${a}" ${M.spellAbility === a ? 'selected' : ''}>${AB_LABEL[a]}</option>`).join('')}</select></label>
             <div class="r"><b data-calc="sc.mod"></b><span>Spellcasting<br>Modifier</span></div>
             <div class="r"><b data-calc="sc.dc"></b><span>Spell Save DC</span></div>
             <div class="r"><b data-calc="sc.atk"></b><span>Spell Attack<br>Bonus</span></div>
@@ -1953,13 +1953,15 @@ const SheetFrames = (() => {
     if (!M) return;
     const pb = num(M.profBonus);
     const md = a => mod(M.abilities[a]?.score);
+    // a blank score (hand-written template) leaves everything worked out from it blank too
+    const has = a => !!a && String(M.abilities[a]?.score ?? '').trim() !== '';
     const out = {};
-    AB.forEach(a => { out['mod.' + a] = sgn(md(a)); out['save.' + a] = sgn(md(a) + (M.abilities[a].save ? pb : 0) + num(M.abilities[a].saveBonus)); });
-    Object.keys(SK).forEach(s => { const k = M.skills[s] || { prof: 0 }; out['skill.' + s] = sgn(md(SK[s]) + Math.floor((+k.prof || 0) * pb) + num(k.bonus)); });
-    out.init = sgn(md('dex') + num(M.initBonus));
-    out.pp = 10 + md('wis') + Math.floor((+M.skills.perception?.prof || 0) * pb) + num(M.skills.perception?.bonus) + num(M.ppBonus);
-    const sa = M.spellAbility || 'int';
-    out['sc.mod'] = sgn(md(sa)); out['sc.dc'] = 8 + pb + md(sa); out['sc.atk'] = sgn(pb + md(sa));
+    AB.forEach(a => { out['mod.' + a] = has(a) ? sgn(md(a)) : ''; out['save.' + a] = has(a) ? sgn(md(a) + (M.abilities[a].save ? pb : 0) + num(M.abilities[a].saveBonus)) : ''; });
+    Object.keys(SK).forEach(s => { const k = M.skills[s] || { prof: 0 }; out['skill.' + s] = has(SK[s]) ? sgn(md(SK[s]) + Math.floor((+k.prof || 0) * pb) + num(k.bonus)) : ''; });
+    out.init = has('dex') ? sgn(md('dex') + num(M.initBonus)) : '';
+    out.pp = has('wis') ? 10 + md('wis') + Math.floor((+M.skills.perception?.prof || 0) * pb) + num(M.skills.perception?.bonus) + num(M.ppBonus) : '';
+    const sa = M.spellAbility;
+    out['sc.mod'] = has(sa) ? sgn(md(sa)) : ''; out['sc.dc'] = has(sa) ? 8 + pb + md(sa) : ''; out['sc.atk'] = has(sa) ? sgn(pb + md(sa)) : '';
     $$('[data-calc]').forEach(el => { const v = out[el.dataset.calc]; if (v != null) el.textContent = v; });
     $$('[data-save]').forEach(b => b.dataset.p = M.abilities[b.dataset.save].save ? 1 : 0);
     $$('[data-skill]').forEach(b => b.dataset.p = M.skills[b.dataset.skill]?.prof || 0);

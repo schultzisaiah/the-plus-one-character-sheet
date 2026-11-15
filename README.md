@@ -9,7 +9,7 @@ A D&D 2024 (5.5e) character sheet that **fills itself in from D&D Beyond**, trac
 ## Quick start
 
 1. **Open the sheet.** A sample character loads so you can poke around. Changes to the sample aren't saved.
-2. **Bring in your character.** Click **Import** to pull one from D&D Beyond, or choose **+ New blank sheet** in the character menu and fill it in by hand.
+2. **Bring in your character.** Click **Import** to pull one from D&D Beyond, or choose **+ New blank sheet** in the character menu. A new blank sheet starts completely empty, so you can type into it or print it as a template to fill in by hand.
 3. **Play.** Track things on screen, or click **Print / PDF** to get paper.
 
 ## Import from D&D Beyond
