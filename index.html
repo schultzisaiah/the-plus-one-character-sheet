@@ -1365,7 +1365,10 @@ const DDBParse = (() => {
           });
           return parts.length > 1 ? parts.map(([nm, n]) => `${nm} ${n}`).join(' · ') : parts.length ? String(parts[0][1]) : '';
         };
-        return { prepMax: per('prep'), cantripMax: per('cantrip'), cantripSwap };
+        // cantrips from species, feats, items etc. don't count toward the class limit: show them alongside it
+        const free = spells.filter(s => s.level === 0 && s.ap).length;
+        const cantripMax = per('cantrip');
+        return { prepMax: per('prep'), cantripMax: free ? `${cantripMax || 0} + ${free} free` : cantripMax, cantripSwap };
       })(),
       noSpells: !casters.length && !spells.length,
       attacksPerAction, armorTraining, weaponProfs: weaponProfs.join(', ') + (weaponProfs.length ? ' weapons' : '').replace(/^(Simple|Martial) weapons$/, '$1 weapons'),
