@@ -780,8 +780,17 @@ span.uses.pool u { width: 34px; height: 12px; border-bottom-width: 1.2px }
 .rt-del[hidden] { display: none }
 .tbl.spl tr:hover .rt-del, .rt-del:hover { opacity: 1; visibility: visible; transition: opacity .12s, visibility 0s }
 .rt-del:hover { border-color: #8c2129; color: #8c2129 }
-.locked .rt-ins, .locked .rt-del { display: none !important }
-@media print { .rt-ins, .rt-del { display: none !important } }
+.rt-grip { position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 12px; height: 18px; padding: 0; border: 0; border-radius: 3px; z-index: 4; cursor: grab; touch-action: none;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 18'%3E%3Cg fill='%236b6873'%3E%3Ccircle cx='4' cy='4' r='1.4'/%3E%3Ccircle cx='8' cy='4' r='1.4'/%3E%3Ccircle cx='4' cy='9' r='1.4'/%3E%3Ccircle cx='8' cy='9' r='1.4'/%3E%3Ccircle cx='4' cy='14' r='1.4'/%3E%3Ccircle cx='8' cy='14' r='1.4'/%3E%3C/g%3E%3C/svg%3E") center / 12px 18px no-repeat;
+  opacity: 0; transition: opacity .12s }
+.tbl.spl tr:hover .rt-grip, .rt-grip:focus, .rt-grip:hover { opacity: 1 }
+.rt-grip:focus-visible { outline: 2px solid #8c2129; outline-offset: 1px }
+body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-select: none }
+body.row-dragging .rt-ins, body.row-dragging .rt-del { visibility: hidden !important }
+.tbl.spl tr.drag-src > td { opacity: .35 }
+.drag-line { position: fixed; height: 0; border-top: 3px solid #8c2129; border-radius: 2px; z-index: 1000; pointer-events: none; box-shadow: 0 0 0 1px #fff }
+.locked .rt-ins, .locked .rt-del, .locked .rt-grip { display: none !important }
+@media print { .rt-ins, .rt-del, .rt-grip, .drag-line { display: none !important } }
 </style>
 
 </head>
@@ -1836,6 +1845,7 @@ const SheetFrames = (() => {
   // ---------- page 2 ----------
   // a row may only be removed when it's completely empty and a filled row sits somewhere below it
   const spellRowEmpty = s => !s || (!String(s.name || '').trim() && !String(s.level ?? '').trim() && !String(s.time || '').trim() && !String(s.range || '').trim() && !String(s.notes || '').replace(/<[^>]*>|&nbsp;/g, '').trim() && !s.c && !s.r && !s.m);
+  const blankSpell = () => ({ level: '', p: null, ap: false, name: '', time: '', range: '', c: false, r: false, m: false, notes: '', nh: 1, material: '', desc: '' });
   const canRemoveRow = i => spellRowEmpty(M.spells[i]) && M.spells.slice(i + 1).some(s => !spellRowEmpty(s));
   function updateRowTools() { $$('#desk .rt-del').forEach(b => { b.hidden = !canRemoveRow(+b.dataset.row); }); }
   function spellRow(i) {
@@ -1845,7 +1855,7 @@ const SheetFrames = (() => {
     // one rule for both: a dash = always prepared (free); a star = counts toward a limit
     const prep = s.ap ? `<span class="cantrip" title="Always prepared: doesn\u2019t count toward ${isCantrip ? 'Cantrips Known' : 'Max Prepared'}">—</span>`
       : dia(p + '.p', 'Prepared').replace('class="dia"', 'class="dia trk"');
-    return `<tr${s.name ? ' class="named"' : ''}><td class="pc">${i === tableStart ? `<span class="rt-ins top noprint"><button class="rt-add" data-at="${i}" title="Insert a blank row here">+</button><i></i></span>` : ''}<span class="rt-ins noprint"><button class="rt-add" data-at="${i + 1}" title="Insert a blank row here">+</button><i></i></span><button class="rt-del noprint" data-row="${i}" title="Remove this empty row" ${canRemoveRow(i) ? '' : 'hidden'}>×</button>${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
+    return `<tr data-row="${i}"${s.name ? ' class="named"' : ''}><td class="pc">${spellRowEmpty(s) ? '' : `<button class="rt-grip noprint" data-row="${i}" title="Drag to move this spell (or press ↑ / ↓)" aria-label="Move ${esc(s.name || 'this row')}: drag, or press up or down arrow"></button>`}${i === tableStart ? `<span class="rt-ins top noprint"><button class="rt-add" data-at="${i}" title="Insert a blank row here">+</button><i></i></span>` : ''}<span class="rt-ins noprint"><button class="rt-add" data-at="${i + 1}" title="Insert a blank row here">+</button><i></i></span><button class="rt-del noprint" data-row="${i}" title="Remove this empty row" ${canRemoveRow(i) ? '' : 'hidden'}>×</button>${prep}</td><td>${f(p + '.level', 'c')}</td><td class="n">${t(p + '.name')}</td><td>${t(p + '.time')}</td><td>${t(p + '.range')}</td>
       <td><div class="crm">${['c', 'r', 'm'].map(k => `<label>${dia(p + '.' + k, k.toUpperCase())}${k.toUpperCase()}</label>`).join('')}</div></td><td>${rich(p + '.notes', 'snote')}</td></tr>`;
   }
   let tableStart = 0;
@@ -2194,7 +2204,7 @@ const SheetFrames = (() => {
       const rt = e.target.closest('.rt-add, .rt-del');
       if (rt) {
         const i = rt.classList.contains('rt-add') ? +rt.dataset.at - 1 : +rt.dataset.row;
-        const blankRow = () => ({ level: '', p: null, ap: false, name: '', time: '', range: '', c: false, r: false, m: false, notes: '', nh: 1, material: '', desc: '' });
+        const blankRow = blankSpell;
         while (M.spells.length < i + 1) M.spells.push(blankRow());
         while (M.spells.length < i + 1) M.spells.push(blankRow());
         if (rt.classList.contains('rt-add')) M.spells.splice(+rt.dataset.at, 0, blankRow()); else if (canRemoveRow(i)) M.spells.splice(i, 1); else return;
@@ -2470,6 +2480,51 @@ const SheetFrames = (() => {
     });
     $('#desk').addEventListener('pointerup', () => { if (!drag) return; const moved = drag.moved; drag = null; if (moved) save(); else $('#avatarFile').click(); });
     $('#desk').addEventListener('click', e => { if (e.target.closest('#portrait .ph') && !prefs.locked) $('#avatarFile').click(); });
+    // spell rows: drag the grip to reorder (works across continuation pages); ↑/↓ on a focused grip moves one row
+    const moveSpell = (from, to) => { // `to` = index of the gap to drop into (0 … rows)
+      if (to === from || to === from + 1) return false;
+      while (M.spells.length < Math.max(from + 1, to)) M.spells.push(blankSpell());
+      const [row] = M.spells.splice(from, 1); M.spells.splice(to > from ? to - 1 : to, 0, row);
+      save(); render(); return true;
+    };
+    let rowDrag = null;
+    const endRowDrag = () => { if (!rowDrag) return; rowDrag.line.remove(); rowDrag.src?.classList.remove('drag-src'); document.body.classList.remove('row-dragging'); cancelAnimationFrame(rowDrag.raf); rowDrag = null; };
+    const dropGap = (x, y) => {
+      const rows = $$('#desk .tbl.spl tbody tr[data-row]'); let best = null;
+      for (const tr of rows) { // nearest row edge to the pointer, on any spell page
+        const r = tr.getBoundingClientRect(); if (x < r.left - 40 || x > r.right + 40) continue;
+        const before = y < r.top + r.height / 2, edge = before ? r.top : r.bottom, d = Math.abs(y - edge);
+        if (!best || d < best.d) best = { d, gap: +tr.dataset.row + (before ? 0 : 1), r, edge };
+      }
+      return best && best.d < 60 ? best : null;
+    };
+    $('#desk').addEventListener('pointerdown', e => {
+      const g = e.target.closest('.rt-grip'); if (!g || prefs.locked || e.button !== 0) return;
+      e.preventDefault(); g.setPointerCapture(e.pointerId);
+      const line = document.createElement('div'); line.className = 'drag-line'; line.hidden = true; document.body.append(line);
+      rowDrag = { from: +g.dataset.row, gap: null, line, src: g.closest('tr'), y: e.clientY, x: e.clientX, moved: false, raf: 0 };
+      // keep the page scrolling while the pointer sits near the top or bottom of the window
+      const tick = () => { if (!rowDrag) return; const h = innerHeight, v = rowDrag.y < 60 ? -12 : rowDrag.y > h - 60 ? 12 : 0; if (v && rowDrag.moved) { scrollBy(0, v); show(); } rowDrag.raf = requestAnimationFrame(tick); };
+      const show = () => { const b = dropGap(rowDrag.x, rowDrag.y); rowDrag.gap = b ? b.gap : null; line.hidden = !b; if (b) Object.assign(line.style, { left: b.r.left + 'px', width: b.r.width + 'px', top: b.edge - 1.5 + 'px' }); };
+      rowDrag.show = show; rowDrag.raf = requestAnimationFrame(tick);
+    });
+    $('#desk').addEventListener('pointermove', e => {
+      if (!rowDrag) return; rowDrag.x = e.clientX;
+      if (!rowDrag.moved && Math.abs(e.clientY - rowDrag.y) < 4) return;
+      rowDrag.y = e.clientY;
+      if (!rowDrag.moved) { rowDrag.moved = true; rowDrag.src.classList.add('drag-src'); document.body.classList.add('row-dragging'); }
+      rowDrag.show();
+    });
+    const finishRowDrag = cancel => { if (!rowDrag) return; const { from, gap, moved } = rowDrag; endRowDrag(); if (!cancel && moved && gap != null && moveSpell(from, gap)) toast('Spell moved'); };
+    $('#desk').addEventListener('pointerup', () => finishRowDrag(false));
+    $('#desk').addEventListener('pointercancel', () => finishRowDrag(true));
+    document.addEventListener('keydown', e => { if (rowDrag && e.key === 'Escape') { e.preventDefault(); finishRowDrag(true); } });
+    $('#desk').addEventListener('keydown', e => {
+      const g = e.target.closest('.rt-grip'); if (!g || prefs.locked || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault(); const i = +g.dataset.row, up = e.key === 'ArrowUp';
+      if (up ? i === 0 : !M.spells.slice(i + 1).some(s => !spellRowEmpty(s)) && i + 1 >= spellsUsed()) return;
+      if (moveSpell(i, up ? i - 1 : i + 2)) $(`#desk .rt-grip[data-row="${up ? i - 1 : i + 1}"]`)?.focus();
+    });
     $('#bSpells').onclick = () => { if (!M) return; M.noSpells = !M.noSpells; save(); render(); toast(M.noSpells ? 'Spellcasting hidden for this character' : 'Spellcasting shown'); };
     const syncTrk = () => { document.body.classList.toggle('trk-blank', prefs.trk !== false); $('#bTrk').setAttribute('aria-pressed', prefs.trk !== false); };
     syncTrk();

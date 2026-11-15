@@ -62,7 +62,7 @@ Leveled up? Import again. It asks before replacing the existing sheet, and repla
 - **Type in any field.** Modifiers, saves, skills, initiative and passive Perception recalculate on their own. Changing your level updates your proficiency bonus.
 - **Dots** cycle through none → proficient → expertise.
 - **Stars** (✧) are uses: spell slots, death saves, Heroic Inspiration, feature charges and more. Click one to spend it and click it again to get it back.
-- **Spells:** the Prep star marks a spell as prepared. **Shift-click** it to make the spell *always prepared*, so it doesn't count toward your limit. Hover between rows to insert or remove one. Extra pages are added as your list grows.
+- **Spells:** the Prep star marks a spell as prepared. **Shift-click** it to make the spell *always prepared*, so it doesn't count toward your limit. Hover between rows to insert or remove one. Drag a spell by the grip at the left of its row to move it (or focus the grip and press ↑ / ↓). Extra pages are added as your list grows.
 
 ## Notes with built-in use trackers
 
