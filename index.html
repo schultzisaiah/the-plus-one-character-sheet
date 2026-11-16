@@ -700,6 +700,9 @@ button.dia { padding: 0 }
 @media print {
   .page.flow, .page.flow.p2lite { page: ref; padding-bottom: .12in !important }
 }
+/* fixed-size pages after page 1 get the same footer in the page itself (they print with no @page margin) */
+.pgfoot { display: none }
+@media print { .page > .pgfoot { display: block; position: absolute !important; left: 0; right: 0; bottom: .155in; z-index: 2; text-align: center; font: 600 7pt/1 "Alegreya Sans", "Gill Sans", sans-serif; letter-spacing: .02em; color: #6b6873 } }
 .portrait .ph { font-size: 9px; line-height: 1.25; padding: 4px }
 span.uses em { cursor: pointer; border-radius: 2px; padding: 0 1px }
 span.uses em:hover { background: rgba(140,33,41,.12); color: #8c2129 }
@@ -1893,11 +1896,22 @@ const SheetFrames = (() => {
         ${box_equip()}
         ${box_coins()}
       </div>
-    </div>${M.source?.id && M.source.id !== 'sample' ? `<div class="foot">Imported from D&amp;D Beyond · ${new Date(M.source.importedAt).toLocaleDateString()}</div>` : ''}</div>`;
+    </div>${pgFoot(2)}${M.source?.id && M.source.id !== 'sample' ? `<div class="foot">Imported from D&amp;D Beyond · ${new Date(M.source.importedAt).toLocaleDateString()}</div>` : ''}</div>`;
+  }
+  // name + page number at the foot of every printed page after the first, in case the pages get shuffled
+  const pgFoot = n => `<div class="pgfoot" data-n="${n}"></div>`;
+  function syncPageName() {
+    let st = document.getElementById('pgName');
+    if (!st) { st = document.createElement('style'); st.id = 'pgName'; document.head.appendChild(st); }
+    const nm = String(M.name || '').replace(/\s+/g, ' ').trim().replace(/[\\"]/g, '\\$&');
+    const css = `@page ref { @bottom-center { content: ${nm ? `"${nm} · " ` : ''}counter(page) } }`;
+    if (st.textContent !== css) st.textContent = css;
+    const lead = M.name ? String(M.name).replace(/\s+/g, ' ').trim() + ' · ' : '';
+    $$('#desk .pgfoot').forEach(el => { el.textContent = lead + el.dataset.n; });
   }
   // no spellcasting: page 2 keeps the personal boxes up top and starts Features & Traits underneath
   function page2lite() {
-    const feats = prefs.ref && M.refHtml ? `<h2>Features &amp; Traits <small>${esc(M.name)} · full text</small></h2>${rich('refHtml')}` : '';
+    const feats = prefs.ref && M.refHtml ? `<h2>Features &amp; Traits <small>full text</small></h2>${rich('refHtml')}` : '';
     return `<div class="page flow ref p2lite" id="pg2"><div class="p2l">
       <div class="p2l-col">${box_back()}</div>
       <div class="p2l-col">${box_equip()}</div>
@@ -1914,7 +1928,7 @@ const SheetFrames = (() => {
     let out = '', from = spellCap(0), k = 1;
     while (used >= from) {
       const to = from + spellCap(k);
-      out += `<div class="page"><section class="box spellsbox" style="--rh:25px;height:100%"><div class="ttl">Cantrips &amp; Spells (continued${k > 1 ? ' ' + k : ''})</div>${spellTable(from, to)}</section></div>`;
+      out += `<div class="page"><section class="box spellsbox" style="--rh:25px;height:100%"><div class="ttl">Cantrips &amp; Spells (continued${k > 1 ? ' ' + k : ''})</div>${spellTable(from, to)}</section>${pgFoot(2 + k)}</div>`;
       from = to; k++;
     }
     return out;
@@ -1942,15 +1956,16 @@ const SheetFrames = (() => {
   function refPages() {
     if (!prefs.ref) return '';
     let out = '';
-    if (M.refHtml && !M.noSpells) out += `<div class="page flow ref"><h2>Features &amp; Traits <small>${esc(M.name)} · full text</small></h2>${rich('refHtml')}</div>`;
-    if (M.spellRefHtml && !M.noSpells) out += `<div class="page flow ref"><h2>Spell Reference <small>${esc(M.name)}</small></h2>${rich('spellRefHtml')}</div>`;
-    out += `<div class="page flow ref noprint-empty"><h2>Notes <small>${esc(M.name)}</small></h2>${rich('extraNotes', '', 'Session notes, NPCs, loot… Prints as a lined page for writing by hand.')}</div>`;
+    if (M.refHtml && !M.noSpells) out += `<div class="page flow ref"><h2>Features &amp; Traits <small>full text</small></h2>${rich('refHtml')}</div>`;
+    if (M.spellRefHtml && !M.noSpells) out += `<div class="page flow ref"><h2>Spell Reference</h2>${rich('spellRefHtml')}</div>`;
+    out += `<div class="page flow ref noprint-empty"><h2>Notes</h2>${rich('extraNotes', '', 'Session notes, NPCs, loot… Prints as a lined page for writing by hand.')}</div>`;
     return out;
   }
 
   // ---------- computed values ----------
   function refresh() {
     if (!M) return;
+    syncPageName();
     const pb = num(M.profBonus);
     const md = a => mod(M.abilities[a]?.score);
     // a blank score (hand-written template) leaves everything worked out from it blank too
